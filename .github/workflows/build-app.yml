@@ -1,0 +1,38 @@
+name: Build static PPM app
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'app-payload-1.txt'
+      - 'app-payload-2.txt'
+      - 'app-payload-3.txt'
+      - 'app-payload-4.txt'
+      - '.github/workflows/build-app.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Reconstruct full static app
+        run: |
+          cat app-payload-1.txt app-payload-2.txt app-payload-3.txt app-payload-4.txt | tr -d '\n\r ' | base64 --decode | gzip --decompress > app.html
+          test -s app.html
+          grep -q 'PPM Field Pro' app.html
+          grep -q 'Lombard Building' app.html
+      - name: Commit generated app
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add app.html
+          if git diff --cached --quiet; then
+            echo 'app.html already current'
+            exit 0
+          fi
+          git commit -m 'Build static Lombard Building PPM app'
+          git push
