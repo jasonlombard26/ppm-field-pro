@@ -5,7 +5,8 @@ on:
     branches: [main]
     paths:
       - 'app-payload-1.txt'
-      - 'app-payload-2.txt'
+      - 'fix2a.txt'
+      - 'fix2b.txt'
       - 'app-payload-3.txt'
       - 'app-payload-4.txt'
       - '.github/workflows/build-app.yml'
@@ -21,7 +22,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Reconstruct full static app
         run: |
-          cat app-payload-1.txt app-payload-2.txt app-payload-3.txt app-payload-4.txt | tr -d '\n\r ' | base64 --decode | gzip --decompress > app.html
+          cat app-payload-1.txt fix2a.txt fix2b.txt app-payload-3.txt app-payload-4.txt | tr -d '\n\r ' | base64 --decode | gzip --decompress > app.html
           test -s app.html
           grep -q 'PPM Field Pro' app.html
           grep -q 'Lombard Building' app.html
