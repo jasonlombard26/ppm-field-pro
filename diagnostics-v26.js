@@ -1,82 +1,23 @@
 (()=>{
 if(window.__ppmDiagnosticsV26)return;window.__ppmDiagnosticsV26=true;
-const VERSION='v26';
+const VERSION='v26.2';
 const errors=[];
+const photoEvents=[];
 const now=()=>new Date().toISOString();
 const push=(type,msg,extra='')=>{errors.push({time:now(),type,msg:String(msg||''),extra:String(extra||'')});if(errors.length>100)errors.shift();};
+const trace=(type,e)=>{try{const t=e.target;const img=t?.closest?.('img');const menu=t?.closest?.('[data-ppm-photo-menu]');if(!img&&!menu)return;const rec={time:now(),type,target:t?.tagName||'',id:t?.id||'',cls:t?.className||'',photoId:img?.dataset?.ppmPhotoId||'',src:img?.currentSrc||img?.src||'',defaultPrevented:!!e.defaultPrevented};photoEvents.push(rec);if(photoEvents.length>30)photoEvents.shift();}catch(_){}};
+['pointerdown','pointerup','click'].forEach(type=>document.addEventListener(type,e=>trace(type,e),true));
 window.addEventListener('error',e=>push('error',e.message,`${e.filename||''}:${e.lineno||''}:${e.colno||''}`));
 window.addEventListener('unhandledrejection',e=>push('promise',e.reason?.stack||e.reason?.message||String(e.reason||'')));
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const yes=v=>v?'✅ Yes':'❌ No';
-function moduleRows(){
- const mods=[
-  ['Diagnostics v26',window.__ppmDiagnosticsV26],
-  ['Photo viewer v9',window.__ppmPhotoViewerV9],
-  ['PC photo viewer v25',window.__ppmPcPhotoViewerV25],
-  ['Photo display v12',window.__ppmPhotoDisplayV12],
-  ['Photo actions v15',window.__ppmPhotoActionsV15],
-  ['Record view v23',window.__ppmRecordViewV23],
-  ['Supabase client',!!window.ppmSupabase]
- ];
- return mods.map(([n,v])=>`<tr><td>${esc(n)}</td><td>${yes(!!v)}</td></tr>`).join('');
-}
-function photoInfo(){
- let total=0,tagged=0,bound=0;
- try{const imgs=[...document.querySelectorAll('#sites img,#photoGrid img,img[data-ppm-photo-id]')];total=imgs.length;tagged=imgs.filter(x=>x.dataset?.ppmPhotoId).length;bound=imgs.filter(x=>x.dataset?.ppmPcV25Bound).length;}catch(_){ }
- return {total,tagged,bound,viewer:!!document.getElementById('ppmPcViewerV25')};
-}
-async function supabaseInfo(){
- const out={client:!!window.ppmSupabase,session:false,user:'',error:''};
- try{if(window.ppmSupabase?.auth){const {data,error}=await window.ppmSupabase.auth.getSession();out.session=!!data?.session;out.user=data?.session?.user?.email||data?.session?.user?.id||'';if(error)out.error=error.message||String(error);}}catch(e){out.error=e.message||String(e);}return out;
-}
-function snapshot(sb){
- const p=photoInfo();
- const nav=navigator.userAgent||'';
- const platform=/Android|iPhone|iPad|iPod/i.test(nav)?'Mobile':'Desktop';
- const dbInfo=typeof db!=='undefined'?{sites:db.sites?.length||0,photos:db.photos?.length||0,devices:db.devices?.length||0}:null;
- return {
-  diagnostics:VERSION,time:now(),platform,userAgent:nav,url:location.href,online:navigator.onLine,
-  supabase:sb,photos:p,db:dbInfo,
-  modules:{photoV9:!!window.__ppmPhotoViewerV9,pcPhotoV25:!!window.__ppmPcPhotoViewerV25,photoDisplayV12:!!window.__ppmPhotoDisplayV12,photoActionsV15:!!window.__ppmPhotoActionsV15,recordViewV23:!!window.__ppmRecordViewV23},
-  errors:[...errors]
- };
-}
-async function render(){
- const panel=document.getElementById('ppmDiagPanelV26');if(!panel)return;
- const sb=await supabaseInfo(),p=photoInfo();
- const dbInfo=typeof db!=='undefined'?`Sites: ${db.sites?.length||0} &nbsp; Photos: ${db.photos?.length||0} &nbsp; Devices: ${db.devices?.length||0}`:'Database object not available';
- panel.querySelector('[data-diag-body]').innerHTML=`
-  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin-bottom:12px">
-   <div class="ppmDiagCard"><b>Runtime</b><div>${/Android|iPhone|iPad|iPod/i.test(navigator.userAgent||'')?'Mobile':'Desktop'}</div><small>${esc(location.href)}</small></div>
-   <div class="ppmDiagCard"><b>Supabase</b><div>${yes(sb.client)} client · ${yes(sb.session)} session</div><small>${esc(sb.user||sb.error||'No signed-in session detected')}</small></div>
-   <div class="ppmDiagCard"><b>Photos</b><div>${p.total} visible · ${p.tagged} tagged · ${p.bound} PC-bound</div><small>Desktop viewer DOM: ${yes(p.viewer)}</small></div>
-   <div class="ppmDiagCard"><b>Database</b><div>${dbInfo}</div></div>
-  </div>
-  <table style="width:100%;border-collapse:collapse;margin-bottom:12px"><thead><tr><th style="text-align:left">Module</th><th style="text-align:left">Loaded</th></tr></thead><tbody>${moduleRows()}</tbody></table>
-  <div style="font-weight:800;margin:8px 0">JavaScript errors (${errors.length})</div>
-  <pre style="white-space:pre-wrap;max-height:180px;overflow:auto;background:#020617;padding:10px;border-radius:8px;color:#e2e8f0">${esc(errors.length?errors.map(e=>`[${e.time}] ${e.type}: ${e.msg} ${e.extra}`).join('\n'):'No captured errors since diagnostics loaded.')}</pre>`;
-}
-function testViewer(){
- push('diagnostic','Test Photo Viewer button pressed');
- const img=document.querySelector('img[data-ppm-photo-id],#sites img,#photoGrid img');
- if(!img){alert('Diagnostics: no site photo is currently visible. Open a site record with a photo, then run this test again.');return;}
- if(typeof window.openPcPhotoViewerV25!=='function'){alert('Diagnostics: PC photo viewer function is NOT loaded. Open Diagnostics and copy the report.');return;}
- try{window.openPcPhotoViewerV25(img.currentSrc||img.src,img.title||img.alt||'Diagnostic photo test');push('diagnostic','PC photo viewer function called successfully');setTimeout(render,50);}catch(e){push('diagnostic','PC photo viewer test failed',e.stack||e.message||String(e));alert('Diagnostics caught a photo-viewer error: '+(e.message||e));render();}
-}
-async function copyReport(){
- const sb=await supabaseInfo(),text=JSON.stringify(snapshot(sb),null,2);
- try{await navigator.clipboard.writeText(text);alert('Diagnostic report copied. Paste it into ChatGPT.');}catch(_){const ta=document.createElement('textarea');ta.value=text;document.body.appendChild(ta);ta.select();document.execCommand('copy');ta.remove();alert('Diagnostic report copied. Paste it into ChatGPT.');}
-}
-function ensure(){
- if(document.getElementById('ppmDiagLauncherV26'))return;
- const css=document.createElement('style');css.textContent='.ppmDiagCard{background:#f8fafc;border:1px solid #cbd5e1;border-radius:9px;padding:10px;color:#0f172a}.ppmDiagCard small{display:block;color:#475569;overflow-wrap:anywhere;margin-top:4px}#ppmDiagPanelV26 td,#ppmDiagPanelV26 th{padding:6px;border-bottom:1px solid #e2e8f0}';document.head.appendChild(css);
- const btn=document.createElement('button');btn.id='ppmDiagLauncherV26';btn.type='button';btn.textContent='🛠 Diagnostics';btn.style.cssText='position:fixed;left:12px;bottom:12px;z-index:2147482500;border:1px solid #64748b;border-radius:10px;background:#0f172a;color:#fff;padding:9px 12px;font-weight:800;cursor:pointer;box-shadow:0 6px 20px #0004';document.body.appendChild(btn);
- const panel=document.createElement('div');panel.id='ppmDiagPanelV26';panel.style.cssText='position:fixed;inset:4%;z-index:2147483000;background:#fff;color:#0f172a;border-radius:14px;box-shadow:0 24px 80px #0008;display:none;overflow:hidden;font:14px Segoe UI,Arial,sans-serif';panel.innerHTML=`<div style="height:100%;display:flex;flex-direction:column"><div style="background:#0f172a;color:white;padding:12px 14px;display:flex;align-items:center;gap:8px"><b style="font-size:17px">PPM Developer Diagnostics ${VERSION}</b><span style="flex:1"></span><button data-act="refresh">Refresh</button><button data-act="test">Test Photo Viewer</button><button data-act="copy">Copy Report</button><button data-act="close">Close</button></div><div data-diag-body style="padding:14px;overflow:auto;flex:1"></div></div>`;document.body.appendChild(panel);
- panel.querySelectorAll('button').forEach(b=>b.style.cssText='border:1px solid #94a3b8;border-radius:7px;background:#fff;color:#0f172a;padding:7px 9px;font-weight:700;cursor:pointer');
- btn.onclick=()=>{panel.style.display='block';render();};
- panel.addEventListener('click',e=>{const a=e.target?.dataset?.act;if(a==='close')panel.style.display='none';if(a==='refresh')render();if(a==='test')testViewer();if(a==='copy')copyReport();});
-}
-new MutationObserver(()=>ensure()).observe(document.documentElement,{childList:true,subtree:true});
-setTimeout(ensure,0);setTimeout(ensure,500);
-window.openPpmDiagnosticsV26=()=>{ensure();document.getElementById('ppmDiagPanelV26').style.display='block';render();};
+function moduleRows(){const mods=[['Diagnostics v26',window.__ppmDiagnosticsV26],['Photo viewer v9',window.__ppmPhotoViewerV9],['PC photo viewer v25',window.__ppmPcPhotoViewerV25],['Photo display v12',window.__ppmPhotoDisplayV12],['Photo actions v15',window.__ppmPhotoActionsV15],['Record view v23',window.__ppmRecordViewV23],['Supabase client',!!window.ppmSupabase]];return mods.map(([n,v])=>`<tr><td>${esc(n)}</td><td>${yes(!!v)}</td></tr>`).join('');}
+function photoInfo(){let total=0,tagged=0,bound=0,inline=0;try{const imgs=[...document.querySelectorAll('#sites img,#photoGrid img,img[data-ppm-photo-id]')];total=imgs.length;tagged=imgs.filter(x=>x.dataset?.ppmPhotoId).length;bound=imgs.filter(x=>x.dataset?.ppmPcV25Bound).length;inline=imgs.filter(x=>String(x.getAttribute('onclick')||'').includes('openPcPhotoViewerV25')).length;}catch(_){}return{total,tagged,bound,inline,viewer:!!document.getElementById('ppmPcViewerV25')};}
+async function supabaseInfo(){const out={client:!!window.ppmSupabase,session:false,user:'',error:''};try{if(window.ppmSupabase?.auth){const {data,error}=await window.ppmSupabase.auth.getSession();out.session=!!data?.session;out.user=data?.session?.user?.email||data?.session?.user?.id||'';if(error)out.error=error.message||String(error);}}catch(e){out.error=e.message||String(e);}return out;}
+function snapshot(sb){const p=photoInfo();const nav=navigator.userAgent||'';const platform=/Android|iPhone|iPad|iPod/i.test(nav)?'Mobile':'Desktop';const dbInfo=typeof db!=='undefined'?{sites:db.sites?.length||0,photos:db.photos?.length||0,devices:db.devices?.length||0}:null;return{diagnostics:VERSION,time:now(),platform,userAgent:nav,url:location.href,online:navigator.onLine,supabase:sb,photos:p,db:dbInfo,modules:{photoV9:!!window.__ppmPhotoViewerV9,pcPhotoV25:!!window.__ppmPcPhotoViewerV25,photoDisplayV12:!!window.__ppmPhotoDisplayV12,photoActionsV15:!!window.__ppmPhotoActionsV15,recordViewV23:!!window.__ppmRecordViewV23},photoEvents:[...photoEvents],errors:[...errors]};}
+async function render(){const panel=document.getElementById('ppmDiagPanelV26');if(!panel)return;const sb=await supabaseInfo(),p=photoInfo();const dbInfo=typeof db!=='undefined'?`Sites: ${db.sites?.length||0} &nbsp; Photos: ${db.photos?.length||0} &nbsp; Devices: ${db.devices?.length||0}`:'Database object not available';panel.querySelector('[data-diag-body]').innerHTML=`<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin-bottom:12px"><div class="ppmDiagCard"><b>Runtime</b><div>${/Android|iPhone|iPad|iPod/i.test(navigator.userAgent||'')?'Mobile':'Desktop'}</div><small>${esc(location.href)}</small></div><div class="ppmDiagCard"><b>Supabase</b><div>${yes(sb.client)} client · ${yes(sb.session)} session</div><small>${esc(sb.user||sb.error||'No signed-in session detected')}</small></div><div class="ppmDiagCard"><b>Photos</b><div>${p.total} visible · ${p.tagged} tagged · ${p.bound} PC-bound · ${p.inline} direct-click</div><small>Desktop viewer DOM: ${yes(p.viewer)}</small></div><div class="ppmDiagCard"><b>Database</b><div>${dbInfo}</div></div></div><table style="width:100%;border-collapse:collapse;margin-bottom:12px"><thead><tr><th style="text-align:left">Module</th><th style="text-align:left">Loaded</th></tr></thead><tbody>${moduleRows()}</tbody></table><div style="font-weight:800;margin:8px 0">Photo event trace (${photoEvents.length})</div><pre style="white-space:pre-wrap;max-height:180px;overflow:auto;background:#020617;padding:10px;border-radius:8px;color:#e2e8f0">${esc(photoEvents.length?photoEvents.map(e=>`[${e.time}] ${e.type} target=${e.target} photoId=${e.photoId||'-'} prevented=${e.defaultPrevented}`).join('\n'):'No photo events captured yet. Click the problem photo, then press Refresh.')}</pre><div style="font-weight:800;margin:8px 0">JavaScript errors (${errors.length})</div><pre style="white-space:pre-wrap;max-height:180px;overflow:auto;background:#020617;padding:10px;border-radius:8px;color:#e2e8f0">${esc(errors.length?errors.map(e=>`[${e.time}] ${e.type}: ${e.msg} ${e.extra}`).join('\n'):'No captured errors since diagnostics loaded.')}</pre>`;}
+function testViewer(){push('diagnostic','Test Photo Viewer button pressed');const img=document.querySelector('img[data-ppm-photo-id],#sites img,#photoGrid img');if(!img){alert('Diagnostics: no site photo is currently visible. Open a site record with a photo, then run this test again.');return;}if(typeof window.openPcPhotoViewerV25!=='function'){alert('Diagnostics: PC photo viewer function is NOT loaded. Open Diagnostics and copy the report.');return;}try{window.openPcPhotoViewerV25(img.currentSrc||img.src,img.title||img.alt||'Diagnostic photo test');push('diagnostic','PC photo viewer function called successfully');setTimeout(render,50);}catch(e){push('diagnostic','PC photo viewer test failed',e.stack||e.message||String(e));alert('Diagnostics caught a photo-viewer error: '+(e.message||e));render();}}
+async function copyReport(){const sb=await supabaseInfo(),text=JSON.stringify(snapshot(sb),null,2);try{await navigator.clipboard.writeText(text);alert('Diagnostic report copied. Paste it into ChatGPT.');}catch(_){const ta=document.createElement('textarea');ta.value=text;document.body.appendChild(ta);ta.select();document.execCommand('copy');ta.remove();alert('Diagnostic report copied. Paste it into ChatGPT.');}}
+function ensure(){if(document.getElementById('ppmDiagLauncherV26'))return;const css=document.createElement('style');css.textContent='.ppmDiagCard{background:#f8fafc;border:1px solid #cbd5e1;border-radius:9px;padding:10px;color:#0f172a}.ppmDiagCard small{display:block;color:#475569;overflow-wrap:anywhere;margin-top:4px}#ppmDiagPanelV26 td,#ppmDiagPanelV26 th{padding:6px;border-bottom:1px solid #e2e8f0}';document.head.appendChild(css);const btn=document.createElement('button');btn.id='ppmDiagLauncherV26';btn.type='button';btn.textContent='🛠 Diagnostics';btn.style.cssText='position:fixed;left:12px;bottom:12px;z-index:2147482500;border:1px solid #64748b;border-radius:10px;background:#0f172a;color:#fff;padding:9px 12px;font-weight:800;cursor:pointer;box-shadow:0 6px 20px #0004';document.body.appendChild(btn);const panel=document.createElement('div');panel.id='ppmDiagPanelV26';panel.style.cssText='position:fixed;inset:4%;z-index:2147483000;background:#fff;color:#0f172a;border-radius:14px;box-shadow:0 24px 80px #0008;display:none;overflow:hidden;font:14px Segoe UI,Arial,sans-serif';panel.innerHTML=`<div style="height:100%;display:flex;flex-direction:column"><div style="background:#0f172a;color:white;padding:12px 14px;display:flex;align-items:center;gap:8px"><b style="font-size:17px">PPM Developer Diagnostics ${VERSION}</b><span style="flex:1"></span><button data-act="refresh">Refresh</button><button data-act="test">Test Photo Viewer</button><button data-act="copy">Copy Report</button><button data-act="close">Close</button></div><div data-diag-body style="padding:14px;overflow:auto;flex:1"></div></div>`;document.body.appendChild(panel);panel.querySelectorAll('button').forEach(b=>b.style.cssText='border:1px solid #94a3b8;border-radius:7px;background:#fff;color:#0f172a;padding:7px 9px;font-weight:700;cursor:pointer');btn.onclick=()=>{panel.style.display='block';render();};panel.addEventListener('click',e=>{const a=e.target?.dataset?.act;if(a==='close')panel.style.display='none';if(a==='refresh')render();if(a==='test')testViewer();if(a==='copy')copyReport();});}
+new MutationObserver(()=>ensure()).observe(document.documentElement,{childList:true,subtree:true});setTimeout(ensure,0);setTimeout(ensure,500);window.openPpmDiagnosticsV26=()=>{ensure();document.getElementById('ppmDiagPanelV26').style.display='block';render();};
 })();
