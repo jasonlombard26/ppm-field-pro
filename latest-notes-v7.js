@@ -72,9 +72,9 @@ const oldDetail=window.renderSiteDetailV6;
 window.renderSiteDetailV7=(id,tab='info')=>{
  const s=db.sites.find(x=>x.id===Number(id));if(!s)return window.showSitesList?.();localStorage.setItem('ppmActiveSiteId',String(s.id));
  if(tab==='info')return oldDetail?.(id,'info');
- const sec=$('sites');if(!sec)return;const tabs=[['info','Site Information'],['ppm','PPM Visits'],['access','Access Control'],['intrusion','Intrusion'],['cctv','CCTV'],['batteries','Batteries'],['integriti','Integriti Inputs']];
+ const sec=$('sites');if(!sec)return;const tabs=[['info','Site Information'],['access','Access Control'],['intrusion','Intrusion'],['cctv','CCTV'],['headend','Head End'],['batteries','Batteries'],['integriti','Integriti Inputs']];
  let body='';
- if(tab==='ppm')body=ppmTab();
+ if(tab==='headend')body='<div class=card><h3 style="margin-top:0">Head End</h3><div class=notice>No Head End records have been added yet.</div></div>';
  else if(tab==='integriti')body=integritiTab();
  else if(['cctv','access','batteries'].includes(tab))body=`<div class=card><div style="display:flex;justify-content:space-between;gap:10px;align-items:center"><h3 style="margin:0">${tabs.find(t=>t[0]===tab)[1]}</h3><button class=primary onclick="deviceFormV7('${tab}')">+ Add ${tab==='cctv'?'Camera':tab==='access'?'Device':'Battery'}</button></div><div style="margin-top:12px">${deviceList(tab)}</div></div>`;
  else body=`<div class=card><h3 style="margin-top:0">Intrusion</h3>${systemRows('intrusion').length?systemRows('intrusion').map(a=>deviceCard(a,'intrusion')).join(''):'<div class=notice>No intrusion records yet. Import Integriti inputs or add equipment through existing data tools.</div>'}</div>`;
