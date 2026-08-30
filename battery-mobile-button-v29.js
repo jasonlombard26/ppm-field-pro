@@ -1,12 +1,15 @@
 (()=>{
 if(window.__ppmBatteryMobileButtonV29)return;window.__ppmBatteryMobileButtonV29=true;
-if(!/Android|iPhone|iPad|iPod/i.test(navigator.userAgent||''))return;
+const mobileUA=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent||'');
+const coarseTouch=Number(navigator.maxTouchPoints||0)>0&&window.matchMedia?.('(pointer: coarse)').matches;
+const narrowScreen=window.matchMedia?.('(max-width: 1100px)').matches;
+if(!(mobileUA||(coarseTouch&&narrowScreen)))return;
 function addButtons(){
  const sec=document.getElementById('sites');if(!sec)return;
  sec.querySelectorAll('button[onclick*="editDeviceV7("]').forEach(edit=>{
   const m=(edit.getAttribute('onclick')||'').match(/editDeviceV7\((\d+),\s*['"]batteries['"]\)/);if(!m)return;
   const assetId=m[1],card=edit.closest('.card');if(!card)return;
-  if(card.querySelector(`button[data-battery-mobile-photo="${assetId}"]`))return;
+  if(card.querySelector(`button[data-battery-mobile-photo="${assetId}"]`)||card.querySelector(`button[onclick*="addDevicePhotoV7(${assetId})"]`))return;
   const btn=document.createElement('button');
   btn.type='button';btn.className='secondary';btn.dataset.batteryMobilePhoto=assetId;btn.textContent='📷 Photo';
   btn.onclick=()=>window.addDevicePhotoV7?.(Number(assetId));
