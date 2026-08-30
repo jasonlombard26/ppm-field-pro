@@ -8,7 +8,8 @@ const bySite=(arr,sid=activeId())=>(arr||[]).filter(x=>x.siteId===sid);
 
 function cleanNav(){
   const nav=document.querySelector('nav');if(!nav)return;
-  ['dash','assets','visits','faults'].forEach(p=>{const b=nav.querySelector(`[data-p="${p}"]`);if(b)b.style.display='none';});
+  ['dash','assets','visits','faults','photos','photo','history'].forEach(p=>{const b=nav.querySelector(`[data-p="${p}"]`);if(b)b.style.display='none';});
+  Array.from(nav.querySelectorAll('button')).forEach(b=>{if(/^(Photos?|History)$/i.test(b.textContent.trim()))b.style.display='none';});
   const sb=nav.querySelector('[data-p="sites"]');if(sb)sb.textContent='Sites';
 }
 
