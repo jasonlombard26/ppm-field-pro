@@ -10,13 +10,15 @@ function ensure(){let el=document.getElementById('ppmPcViewerV25');if(el)return 
  document.getElementById('ppmPcCloseV25').onclick=close;
  el.addEventListener('click',e=>{if(e.target===el)close();});
  document.getElementById('ppmPcControlsV25').addEventListener('click',e=>{const a=e.target?.dataset?.z;if(!a)return;if(a==='in')setScale(scale+.25);if(a==='out')setScale(scale-.25);if(a==='reset')setScale(1);if(a==='pop')popout();});
- const img=document.getElementById('ppmPcImgV25');img.addEventListener('wheel',e=>{e.preventDefault();setScale(scale+(e.deltaY<0?.2:-.2));},{passive:false});img.addEventListener('dblclick',()=>setScale(scale===1?2:1));
+ const img=document.getElementById('ppmPcImgV25');
+ img.addEventListener('wheel',e=>{e.preventDefault();setScale(scale+(e.deltaY<0?0.2:-0.2));},{passive:false});
+ img.addEventListener('dblclick',()=>setScale(scale===1?2:1));
  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&el.style.display!=='none')close();});return el;}
 function setScale(v){scale=clamp(v);const img=document.getElementById('ppmPcImgV25');if(img)img.style.transform=`scale(${scale})`;const z=document.getElementById('ppmPcZoomV25');if(z)z.textContent=`${Math.round(scale*100)}%`;}
 function open(src,label){if(!src)return;currentSrc=src;currentLabel=label||'Site photo';const el=ensure(),img=document.getElementById('ppmPcImgV25');img.src=src;img.alt=currentLabel;el.style.display='flex';document.body.style.overflow='hidden';setScale(1);}
 function close(){const el=document.getElementById('ppmPcViewerV25');if(el)el.style.display='none';document.body.style.overflow='';setScale(1);}
 function popout(){if(!currentSrc)return;const w=window.open('','_blank','popup=yes,width=1200,height=850,resizable=yes,scrollbars=yes');if(!w)return alert('Pop-up blocked. Please allow pop-ups for PPM Field Pro.');w.document.write(`<!doctype html><html><head><title>${esc(currentLabel)}</title><style>html,body{margin:0;height:100%;background:#0b1220}body{display:flex;align-items:center;justify-content:center;overflow:auto}img{max-width:none;max-height:none;width:auto;height:auto}</style></head><body><img src="${esc(currentSrc)}" alt="${esc(currentLabel)}"></body></html>`);w.document.close();}
 window.openPcPhotoViewerV25=open;
-function bind(){document.querySelectorAll('img[data-ppm-photo-id],#sites img,#photoGrid img').forEach(img=>{if(img.id==='ppmPcImgV25'||img.id==='ppmPhotoViewerImg'||img.dataset.ppmPcV25Bound)return;img.dataset.ppmPcV25Bound='1';img.style.cursor='zoom-in';img.addEventListener('click',e=>{e.preventDefault();e.stopImmediatePropagation();open(img.currentSrc||img.src,img.title||img.alt||'Site photo');},false);});}
+function bind(){document.querySelectorAll('img[data-ppm-photo-id],#sites img,#photoGrid img').forEach(img=>{if(img.id==='ppmPcImgV25'||img.id==='ppmPhotoViewerImg'||img.dataset.ppmPcV25Bound)return;img.dataset.ppmPcV25Bound='1';img.style.cursor='zoom-in';img.addEventListener('click',e=>{e.preventDefault();e.stopImmediatePropagation();open(img.currentSrc||img.src,img.title||img.alt||'Site photo');},true);});}
 new MutationObserver(()=>setTimeout(bind,0)).observe(document.documentElement,{childList:true,subtree:true});bind();setTimeout(bind,250);setTimeout(bind,1000);
 })();
