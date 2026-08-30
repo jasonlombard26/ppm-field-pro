@@ -1,4 +1,5 @@
 (()=>{
+if(!/Android|iPhone|iPad|iPod/i.test(navigator.userAgent||''))return;
 if(window.__ppmPhotoViewerV9)return;window.__ppmPhotoViewerV9=true;
 
 function ensureViewer(){
