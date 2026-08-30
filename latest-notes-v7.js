@@ -81,7 +81,7 @@ window.renderSiteDetailV7=(id,tab='info')=>{
  sec.dataset.mode='detail';sec.innerHTML=`<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px"><button class=secondary onclick="showSitesList()">← Sites</button><div><h2 style="margin:0">${v(s.name)}</h2><div class="tiny muted">${v(s.address||'')}</div></div></div><div style="display:flex;gap:7px;overflow-x:auto;padding-bottom:8px;margin-bottom:6px">${tabs.map(t=>`<button class="${t[0]===tab?'primary':'secondary'}" style="white-space:nowrap" onclick="renderSiteDetailV7(${s.id},'${t[0]}')">${t[1]}</button>`).join('')}</div>${body}`;
 };
 window.renderSiteDetailV6=(id,tab='info')=>tab==='info'?oldDetail?.(id,'info'):renderSiteDetailV7(id,tab);
-window.openSiteV6=id=>{setActiveSite(id);setTimeout(()=>window.renderSiteDetailV7?.(id,'headend'),0)};
+window.openSiteV6=id=>{setActiveSite(id);setTimeout(()=>window.renderSiteDetailV7?.(id,'info'),0)};
 
 function startSites(){cleanNav();const sb=document.querySelector('nav [data-p="sites"]');if(sb){document.querySelectorAll('nav button').forEach(x=>x.classList.remove('active'));document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));sb.classList.add('active');$('sites')?.classList.add('active');setTimeout(()=>window.showSitesList?.(),0);}}
 setTimeout(startSites,50);
