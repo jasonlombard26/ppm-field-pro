@@ -11,7 +11,7 @@ function photosFor(assetId){
 function stripHtml(assetId){
  const photos=photosFor(assetId);
  if(!photos.length)return '';
- return `<div data-photo-strip-v12="${assetId}" style="display:flex;gap:8px;overflow-x:auto;margin-top:10px;padding:2px 0 4px">${photos.map(p=>`<img data-ppm-photo-id="${escHtml(String(p.id))}" data-ppm-asset-id="${escHtml(String(assetId))}" src="${escHtml(p.data)}" alt="${escHtml(p.label||'Site photo')}" title="${escHtml(p.label||'Site photo')}" style="width:84px;height:64px;object-fit:cover;border-radius:8px;border:1px solid #cbd5e1;flex:0 0 auto;cursor:zoom-in;-webkit-touch-callout:none;user-select:none">`).join('')}</div>`;
+ return `<div data-photo-strip-v12="${assetId}" style="display:flex;gap:10px;overflow-x:auto;margin-top:10px;padding:2px 0 4px">${photos.map(p=>`<div style="position:relative;flex:0 0 auto"><img data-ppm-photo-id="${escHtml(String(p.id))}" data-ppm-asset-id="${escHtml(String(assetId))}" src="${escHtml(p.data)}" alt="${escHtml(p.label||'Site photo')}" title="${escHtml(p.label||'Site photo')}" draggable="false" style="width:84px;height:64px;object-fit:cover;border-radius:8px;border:1px solid #cbd5e1;display:block;cursor:zoom-in;-webkit-touch-callout:none;user-select:none"><button type="button" data-ppm-photo-menu="${escHtml(String(p.id))}" aria-label="Photo options" title="Photo options" style="position:absolute;top:3px;right:3px;width:30px;height:30px;border:0;border-radius:999px;background:rgba(15,23,42,.78);color:white;font-size:21px;line-height:26px;padding:0;text-align:center;z-index:2">⋮</button></div>`).join('')}</div>`;
 }
 
 function decorate(){
