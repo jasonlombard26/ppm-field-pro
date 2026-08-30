@@ -57,7 +57,7 @@ window.renderSiteDetailV6=(id,tab='info')=>{
   const sec=$('sites');if(!sec)return;
   sec.dataset.mode='detail';
   const v=latestVisit(s.id), cs=contacts(s);
-  const tabs=[['headend','Head End'],['info','Site Information'],['access','Access Control'],['intrusion','Intrusion'],['cctv','CCTV'],['intercom','Intercom'],['batteries','Batteries']];
+  const tabs=[['info','Site Information'],['headend','Head End'],['access','Access Control'],['intrusion','Intrusion'],['cctv','CCTV'],['intercom','Intercom'],['batteries','Batteries']];
   let body='';
   if(tab==='info'){
     body=`<div class=card><div style="display:flex;justify-content:space-between;gap:10px;align-items:start;flex-wrap:wrap"><h3 style="margin:0">Site Information</h3><button class=secondary onclick="editSiteV6(${s.id})">Edit</button></div><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:0 22px;margin-top:8px">${infoRow('Site name',val(s.name))}${infoRow('Address',val(s.address))}${infoRow('Monitoring centre',val(s.monitoringCentre))}${infoRow('Monitoring account number',val(s.monitoringAccountNumber))}${infoRow('Last PPM',fmt(lastPpm(s.id)))}${infoRow('Last other work onsite',fmt(s.lastOtherWorkDate))}${infoRow('Last technician onsite',val(v?.tech||s.lastTechnician))}${infoRow('PPM frequency',s.ppmFrequencyMonths?val(s.ppmFrequencyMonths+' months'):'—')}</div></div><div class=card><h3>Site Contacts</h3>${cs.length?cs.map((c,i)=>infoRow('Contact '+(i+1),`<span>${val(c.name)}</span>${c.phone?`<br><a href="tel:${esc(c.phone)}">${val(c.phone)}</a>`:''}`)).join(''):'<div class=notice>No contacts entered.</div>'}</div>`;
