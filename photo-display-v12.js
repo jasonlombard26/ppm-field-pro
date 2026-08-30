@@ -11,7 +11,7 @@ function photosFor(assetId){
 function stripHtml(assetId){
  const photos=photosFor(assetId);
  if(!photos.length)return '';
- return `<div data-photo-strip-v12="${assetId}" style="display:flex;gap:8px;overflow-x:auto;margin-top:10px;padding:2px 0 4px">${photos.map(p=>`<img src="${escHtml(p.data)}" alt="${escHtml(p.label||'Site photo')}" title="${escHtml(p.label||'Site photo')}" style="width:84px;height:64px;object-fit:cover;border-radius:8px;border:1px solid #cbd5e1;flex:0 0 auto;cursor:zoom-in">`).join('')}</div>`;
+ return `<div data-photo-strip-v12="${assetId}" style="display:flex;gap:8px;overflow-x:auto;margin-top:10px;padding:2px 0 4px">${photos.map(p=>`<img data-ppm-photo-id="${escHtml(String(p.id))}" data-ppm-asset-id="${escHtml(String(assetId))}" src="${escHtml(p.data)}" alt="${escHtml(p.label||'Site photo')}" title="${escHtml(p.label||'Site photo')}" style="width:84px;height:64px;object-fit:cover;border-radius:8px;border:1px solid #cbd5e1;flex:0 0 auto;cursor:zoom-in;-webkit-touch-callout:none;user-select:none">`).join('')}</div>`;
 }
 
 function decorate(){
