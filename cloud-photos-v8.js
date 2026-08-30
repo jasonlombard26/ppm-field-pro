@@ -10,11 +10,14 @@ const client=()=>window.ppmSupabase;
 const cloudCache=new Map();
 
 async function signedUrl(path){
-  if(cloudCache.has(path))return cloudCache.get(path);
+  const cached=cloudCache.get(path);
+  if(cached&&cached.expiresAt>Date.now())return cached.url;
   const c=client();if(!c)return '';
   const {data,error}=await c.storage.from(BUCKET).createSignedUrl(path,3600);
   if(error){console.warn('Photo signed URL failed',error);return '';}
-  const url=data?.signedUrl||'';if(url)cloudCache.set(path,url);return url;
+  const url=data?.signedUrl||'';
+  if(url)cloudCache.set(path,{url,expiresAt:Date.now()+50*60*1000});
+  return url;
 }
 
 function labelFromName(name){
@@ -35,7 +38,8 @@ async function discoverAssetPhotos(asset){
     if(!/\.(jpe?g|png|webp|gif|heic|heif)$/i.test(f.name))continue;
     let p=db.photos.find(x=>x.cloudPath===path);
     if(!p){p={id:`cloud:${f.id||path}`,siteId:sid,assetRef:String(asset.id),label:labelFromName(f.name),comment:'',cloudPath:path,createdAt:f.created_at||f.updated_at||new Date().toISOString(),cloudShared:true};db.photos.push(p);changed=true;}
-    if(!p.data){const url=await signedUrl(path);if(url){p.data=url;p.cloudSignedUrl=true;changed=true;}}
+    const url=await signedUrl(path);
+    if(url&&p.data!==url){p.data=url;p.cloudSignedUrl=true;changed=true;}
   }
   return changed;
 }
