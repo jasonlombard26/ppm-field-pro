@@ -1,10 +1,11 @@
 (()=>{
 if(window.__ppmFieldUpdatesV10)return;window.__ppmFieldUpdatesV10=true;
 const $=id=>document.getElementById(id);
-const e=x=>typeof esc==='function'?esc(x??''):String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const e=x=>typeof esc==='function'?esc(x??''):String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[c]));
 const activeId=()=>Number(localStorage.getItem('ppmActiveSiteId'))||db.sites?.[0]?.id;
 const bySite=()=> (db.assets||[]).filter(a=>a.siteId===activeId());
 const oldForm=window.deviceFormV7, oldSave=window.saveDeviceV7, oldRender=window.renderSiteDetailV7;
+const isDesktopV10=()=>!/Android|iPhone|iPad|iPod/i.test(navigator.userAgent||'');
 
 function yesNo(id,val){return `<select id="${id}"><option value="No" ${String(val||'No')==='No'?'selected':''}>No</option><option value="Yes" ${String(val)==='Yes'?'selected':''}>Yes</option></select>`;}
 function batteryTypeControls(a){
@@ -36,7 +37,8 @@ function cardHtml(a,key){
  if(key==='cctv')extra=`<div class=tiny style="margin-top:7px">Type: ${e(a.cameraType||a.subtype||'—')} · Model: ${e(a.model||'—')}</div><div class=tiny>IP: ${e(a.ip||'—')} · Mask: ${e(a.subnetMask||'—')} · Gateway: ${e(a.gateway||'—')}</div><div class=tiny>Login: ${e(a.userLogin||'—')} · Password: ${e(a.password||'—')}</div>`;
  if(key==='access')extra=`<div class=tiny style="margin-top:7px">Door: ${e(a.doorNumber||a.pointId||'—')} · Reader In: ${e(a.readerIn||'—')} · Reader Out: ${e(a.readerOut||'—')}</div><div class=tiny>Lock: ${e(a.lockType||'—')} · REX: ${e(a.rex||'No')} · EBG: ${e(a.ebg||'No')}</div><div class=tiny>Controller / Module: ${e(a.controllerModule||'—')}${a.other?` · Other: ${e(a.other)}`:''}</div>`;
  if(key==='batteries')extra=`<div class=tiny style="margin-top:7px">Battery: ${e(a.batteryNumber||a.pointId||'—')} · Installation: ${e(a.batteryInstallationDate||'—')} · Type: ${e(a.batteryType||'—')}</div><div class=tiny>Voltage: ${e(a.batteryVoltage||'—')} V · After load: ${e(a.loadTestVoltage||'—')} V</div>`;
- return `<div class=card style="margin:0 0 9px"><div style="display:flex;justify-content:space-between;gap:8px;align-items:start"><div><b>${e(a.name||a.cameraName||a.pointId||a.subtype||'Equipment')}</b><div class="tiny muted">${e(a.location||'')}</div>${extra}</div><div style="display:flex;gap:6px;flex-wrap:wrap"><button class=secondary onclick="editDeviceV7(${a.id},'${key}')">Edit</button>${key==='cctv'||key==='access'?`<button class=secondary onclick="addDevicePhotoV7(${a.id})">📷 Photo</button>`:''}</div></div></div>`;
+ const photoButton=(!isDesktopV10()&&(key==='cctv'||key==='access'))?`<button class=secondary onclick="addDevicePhotoV7(${a.id})">📷 Photo</button>`:'';
+ return `<div class=card style="margin:0 0 9px"><div style="display:flex;justify-content:space-between;gap:8px;align-items:start"><div><b>${e(a.name||a.cameraName||a.pointId||a.subtype||'Equipment')}</b><div class="tiny muted">${e(a.location||'')}</div>${extra}</div><div style="display:flex;gap:6px;flex-wrap:wrap"><button class=secondary onclick="editDeviceV7(${a.id},'${key}')">Edit</button>${photoButton}</div></div></div>`;
 }
 function rowsFor(key){const all=bySite();if(key==='cctv')return all.filter(a=>(a.system||'').toLowerCase().includes('cctv'));if(key==='access')return all.filter(a=>(a.system||'').toLowerCase().includes('access'));if(key==='batteries')return all.filter(a=>/batter|power/i.test(`${a.system||''} ${a.subtype||''}`));return [];}
 function replaceSection(key){const sec=$('sites');const card=Array.from(sec?.children||[]).find(x=>x.classList?.contains('card'));if(!card)return;const rows=rowsFor(key);const title=key==='cctv'?'CCTV':key==='access'?'Access Control':'Batteries';const add=key==='cctv'?'Camera':key==='access'?'Device':'Battery';card.innerHTML=`<div style="display:flex;justify-content:space-between;gap:10px;align-items:center"><h3 style="margin:0">${title}</h3><button class=primary onclick="deviceFormV7('${key}')">+ Add ${add}</button></div><div style="margin-top:12px">${rows.length?rows.map(a=>cardHtml(a,key)).join(''):'<div class=notice>No records in this section yet.</div>'}</div>`;}
