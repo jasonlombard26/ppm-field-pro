@@ -6,7 +6,22 @@ let timer=null,longPressed=false,currentPhoto=null;
 const client=()=>window.ppmSupabase;
 const safe=s=>(s||'photo').replace(/[^a-zA-Z0-9._-]+/g,'-').replace(/^-+|-+$/g,'').slice(0,80)||'photo';
 const findPhoto=id=>(db.photos||[]).find(p=>String(p.id)===String(id));
-const refresh=()=>{if(typeof save==='function')save();if(typeof window.refreshPhotoDisplayV12==='function')window.refreshPhotoDisplayV12();setTimeout(decorateAllPhotos,50);};
+function contextFor(photo){
+ const asset=(db.assets||[]).find(a=>String(a.id)===String(photo?.assetRef||''));
+ const siteId=Number(photo?.siteId||asset?.siteId||localStorage.getItem('ppmActiveSiteId'))||db.sites?.[0]?.id;
+ const sys=String(asset?.system||'').toLowerCase();
+ const tab=sys.includes('cctv')?'cctv':sys.includes('access')?'access':'info';
+ return {siteId,tab};
+}
+const refresh=photo=>{
+ const ctx=contextFor(photo);
+ if(typeof save==='function')save();
+ setTimeout(()=>{
+  if(typeof window.renderSiteDetailV7==='function')window.renderSiteDetailV7(ctx.siteId,ctx.tab);
+  if(typeof window.refreshPhotoDisplayV12==='function')window.refreshPhotoDisplayV12();
+  setTimeout(decorateAllPhotos,80);
+ },30);
+};
 
 function htmlEsc(x){return String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function closeMenu(){const el=$('ppmPhotoActionMenu');if(el)el.remove();currentPhoto=null;}
@@ -26,13 +41,14 @@ async function renamePhoto(photo){const name=prompt('Rename photo',photo.label||
   const {error}=await client().storage.from(BUCKET).move(oldPath,newPath);if(error){console.error(error);return alert('The shared photo could not be renamed.');}
   photo.cloudPath=newPath;const {data}=await client().storage.from(BUCKET).createSignedUrl(newPath,3600);if(data?.signedUrl)photo.data=data.signedUrl;
  }
- photo.label=trimmed;refresh();closeMenu();}
+ photo.label=trimmed;closeMenu();refresh(photo);}
 
 async function deletePhoto(photo){if(!confirm(`Delete “${photo.label||'this photo'}”? This cannot be undone.`))return;
+ const ctxPhoto={...photo};
  if(photo.cloudPath&&client()){
   const {error}=await client().storage.from(BUCKET).remove([photo.cloudPath]);if(error){console.error(error);return alert('The shared photo could not be deleted.');}
  }
- db.photos=(db.photos||[]).filter(p=>String(p.id)!==String(photo.id));refresh();closeMenu();}
+ db.photos=(db.photos||[]).filter(p=>String(p.id)!==String(photo.id));closeMenu();refresh(ctxPhoto);}
 
 async function sharePhoto(photo){try{
  let blob=null,file=null;const name=safe(photo.label||'site-photo')+'.jpg';
