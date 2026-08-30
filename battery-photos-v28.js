@@ -2,7 +2,6 @@
 if(window.__ppmBatteryPhotosV28)return;window.__ppmBatteryPhotosV28=true;
 const BUCKET='ppm-photos';
 const $=id=>document.getElementById(id);
-const isMobile=()=>/Android|iPhone|iPad|iPod/i.test(navigator.userAgent||'');
 const activeSiteId=()=>Number(localStorage.getItem('ppmActiveSiteId'))||db.sites?.[0]?.id;
 const client=()=>window.ppmSupabase;
 const safe=s=>(s||'photo').replace(/[^a-zA-Z0-9._-]+/g,'-').replace(/^-+|-+$/g,'').slice(0,80)||'photo';
@@ -65,9 +64,6 @@ function decorate(){
  sec.querySelectorAll('button[onclick*="editDeviceV7("]').forEach(edit=>{
   const m=(edit.getAttribute('onclick')||'').match(/editDeviceV7\((\d+),\s*['"]batteries['"]\)/);if(!m)return;
   const assetId=m[1],card=edit.closest('.card');if(!card)return;
-  if(isMobile()&&!card.querySelector(`button[data-battery-photo-add="${assetId}"]`)){
-   const b=document.createElement('button');b.type='button';b.className='secondary';b.dataset.batteryPhotoAdd=assetId;b.textContent='📷 Photo';b.onclick=()=>window.addDevicePhotoV7?.(Number(assetId));edit.insertAdjacentElement('afterend',b);
-  }
   card.querySelectorAll(`[data-battery-photo-strip="${assetId}"]`).forEach(x=>x.remove());
   const photos=(db.photos||[]).filter(p=>Number(p.siteId)===Number(activeSiteId())&&String(p.assetRef||'')===String(assetId)&&p.data);
   if(!photos.length)return;
