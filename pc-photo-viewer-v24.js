@@ -1,4 +1,5 @@
 (()=>{
+if(/Android|iPhone|iPad|iPod/i.test(navigator.userAgent||''))return;
 if(window.__ppmPcPhotoViewerV24)return;window.__ppmPcPhotoViewerV24=true;
 let scale=1;
 const clamp=v=>Math.max(.25,Math.min(6,v));
