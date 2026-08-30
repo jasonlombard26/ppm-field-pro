@@ -72,7 +72,7 @@ const oldDetail=window.renderSiteDetailV6;
 window.renderSiteDetailV7=(id,tab='info')=>{
  const s=db.sites.find(x=>x.id===Number(id));if(!s)return window.showSitesList?.();localStorage.setItem('ppmActiveSiteId',String(s.id));
  if(tab==='info')return oldDetail?.(id,'info');
- const sec=$('sites');if(!sec)return;const tabs=[['headend','Head End'],['info','Site Information'],['access','Access Control'],['intrusion','Intrusion'],['cctv','CCTV'],['batteries','Batteries'],['integriti','Integriti Inputs']];
+ const sec=$('sites');if(!sec)return;const tabs=[['info','Site Information'],['headend','Head End'],['access','Access Control'],['intrusion','Intrusion'],['cctv','CCTV'],['batteries','Batteries'],['integriti','Integriti Inputs']];
  let body='';
  if(tab==='headend')body='<div class=card><h3 style="margin-top:0">Head End</h3><div class=notice>No Head End records have been added yet.</div></div>';
  else if(tab==='integriti')body=integritiTab();
