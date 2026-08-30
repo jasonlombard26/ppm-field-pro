@@ -13,14 +13,23 @@ function contextFor(photo){
  const tab=sys.includes('cctv')?'cctv':sys.includes('access')?'access':'info';
  return {siteId,tab};
 }
-const refresh=photo=>{
+function restoreContext(ctx){
+ if(!ctx?.siteId)return;
+ localStorage.setItem('ppmActiveSiteId',String(ctx.siteId));
+ if(typeof window.renderSiteDetailV7==='function')window.renderSiteDetailV7(ctx.siteId,ctx.tab);
+ if(typeof window.refreshPhotoDisplayV12==='function')window.refreshPhotoDisplayV12();
+ setTimeout(decorateAllPhotos,60);
+}
+const refresh=(photo,persistLocal=false)=>{
  const ctx=contextFor(photo);
- if(typeof save==='function')save();
- setTimeout(()=>{
-  if(typeof window.renderSiteDetailV7==='function')window.renderSiteDetailV7(ctx.siteId,ctx.tab);
-  if(typeof window.refreshPhotoDisplayV12==='function')window.refreshPhotoDisplayV12();
-  setTimeout(decorateAllPhotos,80);
- },30);
+ // Cloud photo rename/delete already persists directly in Supabase Storage. Avoid the app-wide
+ // save() path because it rebuilds the Sites list and navigates away from the current record.
+ if(persistLocal&&typeof save==='function'){
+  save();
+  [20,120,350,800].forEach(ms=>setTimeout(()=>restoreContext(ctx),ms));
+ }else{
+  restoreContext(ctx);
+ }
 };
 
 function htmlEsc(x){return String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
@@ -29,26 +38,27 @@ function openMenu(photo){
  closeMenu();currentPhoto=photo;
  const wrap=document.createElement('div');wrap.id='ppmPhotoActionMenu';
  wrap.style.cssText='position:fixed;inset:0;z-index:100001;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center;padding:16px;box-sizing:border-box';
- wrap.innerHTML=`<div style="background:white;color:#0f172a;border-radius:16px;padding:12px;width:min(420px,100%);box-shadow:0 20px 40px rgba(0,0,0,.28)"><div style="font-weight:700;padding:8px 10px 12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${htmlEsc(photo.label||'Site photo')}</div><button type="button" data-action="rename" style="width:100%;min-height:48px;padding:13px;border:0;border-top:1px solid #e2e8f0;background:white;text-align:left;font-size:17px">Rename</button><button type="button" data-action="share" style="width:100%;min-height:48px;padding:13px;border:0;border-top:1px solid #e2e8f0;background:white;text-align:left;font-size:17px">Share</button><button type="button" data-action="delete" style="width:100%;min-height:52px;padding:13px;border:0;border-top:1px solid #e2e8f0;background:#fff7f7;text-align:left;font-size:18px;font-weight:800;color:#b91c1c">🗑 Delete Photo</button><button type="button" data-action="cancel" style="width:100%;min-height:48px;padding:13px;border:0;border-top:1px solid #e2e8f0;background:white;text-align:center;font-size:16px;font-weight:700">Cancel</button></div>`;
+ wrap.innerHTML=`<div style="background:white;color:#0f172a;border-radius:16px;padding:12px;width:min(420px,100%);box-shadow:0 20px 40px rgba(0,0,0,.28)"><div style="font-weight:700;padding:8px 10px 12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${htmlEsc(photo.label||'Site photo')}</div><button type="button" data-action="rename" style="width:100%;min-height:48px;padding:13px;border:0;border-top:1px solid #e2e8f0;background:white;text-align:left;font-size:17px">Rename</button><button type="button" data-action="share" style="width:100%;min-height:48px;padding:13px;border:0;border-top:1px solid #e2e8f0;background:white;text-align:left;font-size:17px">Share</button><button type="button" data-action="download" style="width:100%;min-height:48px;padding:13px;border:0;border-top:1px solid #e2e8f0;background:white;text-align:left;font-size:17px">Download</button><button type="button" data-action="delete" style="width:100%;min-height:52px;padding:13px;border:0;border-top:1px solid #e2e8f0;background:#fff7f7;text-align:left;font-size:18px;font-weight:800;color:#b91c1c">🗑 Delete Photo</button><button type="button" data-action="cancel" style="width:100%;min-height:48px;padding:13px;border:0;border-top:1px solid #e2e8f0;background:white;text-align:center;font-size:16px;font-weight:700">Cancel</button></div>`;
  document.body.appendChild(wrap);
- wrap.addEventListener('click',e=>{const a=e.target?.dataset?.action;if(!a){if(e.target===wrap)closeMenu();return;}if(a==='cancel')return closeMenu();if(a==='rename')return renamePhoto(photo);if(a==='share')return sharePhoto(photo);if(a==='delete')return deletePhoto(photo);});
+ wrap.addEventListener('click',e=>{const a=e.target?.dataset?.action;if(!a){if(e.target===wrap)closeMenu();return;}if(a==='cancel')return closeMenu();if(a==='rename')return renamePhoto(photo);if(a==='share')return sharePhoto(photo);if(a==='download')return downloadPhoto(photo);if(a==='delete')return deletePhoto(photo);});
 }
 window.openPhotoActionsV13=id=>{const p=findPhoto(id);if(p)openMenu(p);};
 
 async function renamePhoto(photo){const name=prompt('Rename photo',photo.label||'Site photo');if(name===null)return;const trimmed=name.trim();if(!trimmed)return alert('Enter a photo name.');
- if(photo.cloudPath&&client()){
+ const isCloud=!!photo.cloudPath;
+ if(isCloud&&client()){
   const oldPath=photo.cloudPath,slash=oldPath.lastIndexOf('/'),folder=oldPath.slice(0,slash),file=oldPath.slice(slash+1),ext=(file.match(/\.[a-zA-Z0-9]+$/)||['.jpg'])[0],newPath=`${folder}/${Date.now()}__${encodeURIComponent(safe(trimmed))}__renamed${ext}`;
   const {error}=await client().storage.from(BUCKET).move(oldPath,newPath);if(error){console.error(error);return alert('The shared photo could not be renamed.');}
   photo.cloudPath=newPath;const {data}=await client().storage.from(BUCKET).createSignedUrl(newPath,3600);if(data?.signedUrl)photo.data=data.signedUrl;
  }
- photo.label=trimmed;closeMenu();refresh(photo);}
+ photo.label=trimmed;closeMenu();refresh(photo,!isCloud);}
 
 async function deletePhoto(photo){if(!confirm(`Delete “${photo.label||'this photo'}”? This cannot be undone.`))return;
- const ctxPhoto={...photo};
- if(photo.cloudPath&&client()){
+ const ctxPhoto={...photo},isCloud=!!photo.cloudPath;
+ if(isCloud&&client()){
   const {error}=await client().storage.from(BUCKET).remove([photo.cloudPath]);if(error){console.error(error);return alert('The shared photo could not be deleted.');}
  }
- db.photos=(db.photos||[]).filter(p=>String(p.id)!==String(photo.id));closeMenu();refresh(ctxPhoto);}
+ db.photos=(db.photos||[]).filter(p=>String(p.id)!==String(photo.id));closeMenu();refresh(ctxPhoto,!isCloud);}
 
 async function sharePhoto(photo){try{
  let blob=null,file=null;const name=safe(photo.label||'site-photo')+'.jpg';
@@ -57,6 +67,19 @@ async function sharePhoto(photo){try{
  if(/^https?:/i.test(photo.data||'')){window.open(photo.data,'_blank');closeMenu();return;}
  alert('Sharing is not supported on this device.');
  }catch(err){if(err?.name!=='AbortError'){console.error(err);alert('The photo could not be shared.');}}
+}
+
+async function downloadPhoto(photo){
+ try{
+  if(!photo.data)return alert('This photo is not available to download.');
+  const response=await fetch(photo.data);if(!response.ok)throw new Error('Download failed');
+  const blob=await response.blob();
+  const type=blob.type||'image/jpeg';
+  const ext=type.includes('png')?'.png':type.includes('webp')?'.webp':type.includes('gif')?'.gif':'.jpg';
+  const url=URL.createObjectURL(blob),a=document.createElement('a');
+  a.href=url;a.download=safe(photo.label||'site-photo')+ext;a.style.display='none';document.body.appendChild(a);a.click();a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),1500);closeMenu();
+ }catch(err){console.error(err);alert('The photo could not be downloaded on this device.');}
 }
 
 function matchPhotoForImg(img){
