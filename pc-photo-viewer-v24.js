@@ -26,29 +26,25 @@ function ensureControls(){
     w.document.close();
   }));
   el.appendChild(bar);
-  const img=image();if(img&&!img.dataset.pcZoomBound){
-    img.dataset.pcZoomBound='1';
+  const img=image();if(img&&!img.dataset.ppmPcZoomBound){
+    img.dataset.ppmPcZoomBound='1';
     img.style.cursor='zoom-in';
-    img.addEventListener('dblclick',ev=>{ev.preventDefault();setScale(scale===1?2:1);});
-    img.addEventListener('wheel',ev=>{if(viewer()?.style.display==='none')return;ev.preventDefault();setScale(scale+(ev.deltaY<0?.2:-.2));},{passive:false});
+    img.addEventListener('dblclick',e=>{e.preventDefault();setScale(scale===1?2:1);});
+    img.addEventListener('wheel',e=>{if(viewer()?.style.display==='none')return;e.preventDefault();setScale(scale+(e.deltaY<0?0.2:-0.2));},{passive:false});
   }
 }
 const oldOpen=window.openPhotoViewerV9;
 if(typeof oldOpen==='function')window.openPhotoViewerV9=(src,label='')=>{oldOpen(src,label);ensureControls();setScale(1);};
 const oldClose=window.closePhotoViewerV9;
 if(typeof oldClose==='function')window.closePhotoViewerV9=()=>{setScale(1);oldClose();};
-function isRecordPhoto(img){
-  if(!img||img.id==='ppmPhotoViewerImg'||!img.src)return false;
-  if(img.closest('#ppmPhotoViewer'))return false;
-  return !!img.closest('#sites,#photoGrid,#modalRoot,.modal,.modalBox,[role="dialog"]');
-}
-document.addEventListener('click',ev=>{
-  const img=ev.target?.closest?.('img');
-  if(!isRecordPhoto(img))return;
-  ev.preventDefault();ev.stopPropagation();ev.stopImmediatePropagation();
-  window.openPhotoViewerV9?.(img.src,img.title||img.alt||'Site photo');
+document.addEventListener('click',e=>{
+  const img=e.target?.closest?.('img[data-ppm-photo-id], #sites img, #photoGrid img');
+  if(!img||img.id==='ppmPhotoViewerImg'||!img.src)return;
+  if(typeof window.openPhotoViewerV9==='function'){
+    e.preventDefault();e.stopPropagation();
+    window.openPhotoViewerV9(img.src,img.title||img.alt||'Site photo');
+  }
 },true);
-function markImages(){document.querySelectorAll('#sites img,#photoGrid img,#modalRoot img,.modal img,.modalBox img,[role="dialog"] img').forEach(img=>{if(img.id!=='ppmPhotoViewerImg'&&!img.closest('#ppmPhotoViewer')){img.style.cursor='zoom-in';img.title=img.title||'Click to enlarge photo';}});ensureControls();}
-new MutationObserver(markImages).observe(document.documentElement,{childList:true,subtree:true});
-setTimeout(markImages,0);setTimeout(markImages,500);
+new MutationObserver(()=>ensureControls()).observe(document.documentElement,{childList:true,subtree:true});
+setTimeout(ensureControls,0);
 })();
