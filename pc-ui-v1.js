@@ -28,6 +28,12 @@ html.ppm-pc-ui #ppmCloudStatus{white-space:nowrap}
 `;
 document.head.appendChild(css);
 
+function hideDevicePhotoButtons(){
+ document.querySelectorAll('#sites .card button').forEach(b=>{
+  const t=(b.textContent||'').trim().toLowerCase();
+  if(t==='photo'||t==='photos'||t==='📷 photo'||t==='📷 photos')b.style.display='none';
+ });
+}
 function setup(){
  const nav=document.querySelector('nav');
  if(nav&&!nav.querySelector('.pc-brand')){
@@ -38,13 +44,15 @@ function setup(){
    const pill=document.createElement('span');pill.className='pc-mode-pill';pill.textContent='PC MODE';header.insertBefore(pill,header.firstChild);
  }
  const title=document.querySelector('header h1,header h2');if(title)title.textContent='PPM Field Pro — Desktop';
+ hideDevicePhotoButtons();
  if(typeof window.showSitesList==='function'){
    const sitesBtn=document.querySelector('nav [data-p="sites"]');
    if(sitesBtn){sitesBtn.click();setTimeout(()=>window.showSitesList(),0);}
  }
 }
 
+new MutationObserver(()=>setTimeout(hideDevicePhotoButtons,0)).observe(document.documentElement,{childList:true,subtree:true});
 const oldRender=window.renderSiteDetailV7;
-if(typeof oldRender==='function')window.renderSiteDetailV7=function(id,tab='info'){const r=oldRender(id,tab);setTimeout(()=>{const sec=document.getElementById('sites');if(sec){const cards=sec.querySelectorAll('.card');cards.forEach(c=>c.style.maxWidth='none');}},0);return r;};
+if(typeof oldRender==='function')window.renderSiteDetailV7=function(id,tab='info'){const r=oldRender(id,tab);setTimeout(()=>{const sec=document.getElementById('sites');if(sec){const cards=sec.querySelectorAll('.card');cards.forEach(c=>c.style.maxWidth='none');}hideDevicePhotoButtons();},0);return r;};
 setTimeout(setup,0);
 })();
