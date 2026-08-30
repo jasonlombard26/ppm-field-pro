@@ -1,0 +1,56 @@
+(()=>{
+if(window.__ppmPhotoActionsV15)return;window.__ppmPhotoActionsV15=true;
+const BUCKET='ppm-photos';
+const $=id=>document.getElementById(id);
+const client=()=>window.ppmSupabase;
+const safe=s=>(s||'photo').replace(/[^a-zA-Z0-9._-]+/g,'-').replace(/^-+|-+$/g,'').slice(0,80)||'photo';
+const findPhoto=id=>(db.photos||[]).find(p=>String(p.id)===String(id));
+let timer=null,longPressed=false;
+function escHtml(x){return String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function closeMenu(){document.getElementById('ppmPhotoActionMenuV15')?.remove();}
+function imagesFor(photo){return [...document.querySelectorAll('#sites img')].filter(img=>String(img.dataset?.ppmPhotoId||'')===String(photo.id)||(photo.data&&(img.getAttribute('src')===photo.data||String(img.src||'')===String(photo.data))));}
+function removePhotoFromScreen(photo){imagesFor(photo).forEach(img=>{const wrapper=img.parentElement;wrapper?.querySelector?.(`button[data-ppm-photo-menu="${CSS.escape(String(photo.id))}"]`)?.remove();if(wrapper&&wrapper.children.length<=1&&wrapper.parentElement?.hasAttribute?.('data-photo-strip-v12'))wrapper.remove();else img.remove();});document.querySelectorAll(`button[data-ppm-photo-menu="${CSS.escape(String(photo.id))}"]`).forEach(b=>b.remove());}
+function renamePhotoOnScreen(photo){imagesFor(photo).forEach(img=>{img.alt=photo.label||'Site photo';img.title=photo.label||'Site photo';});}
+function pathFromSignedUrl(url){
+ try{
+  if(!url)return '';
+  const u=new URL(url,location.href),p=decodeURIComponent(u.pathname);
+  const markers=[`/storage/v1/object/sign/${BUCKET}/`,`/storage/v1/object/authenticated/${BUCKET}/`,`/storage/v1/object/public/${BUCKET}/`];
+  for(const m of markers){const i=p.indexOf(m);if(i>=0)return p.slice(i+m.length);}
+ }catch(e){}
+ return '';
+}
+function cloudPathFor(photo){return photo?.cloudPath||pathFromSignedUrl(photo?.data||'');}
+async function verifyGone(path){
+ const c=client();if(!c||!path)return false;
+ const slash=path.lastIndexOf('/');if(slash<0)return false;
+ const folder=path.slice(0,slash),name=path.slice(slash+1);
+ const {data,error}=await c.storage.from(BUCKET).list(folder,{limit:100,search:name});
+ if(error){console.error('Photo delete verification failed',error);return false;}
+ return !(data||[]).some(x=>x?.name===name);
+}
+async function renamePhoto(photo){const name=prompt('Rename photo',photo.label||'Site photo');if(name===null)return;const trimmed=name.trim();if(!trimmed)return alert('Enter a photo name.');const oldPath=cloudPathFor(photo);if(oldPath&&client()){const slash=oldPath.lastIndexOf('/'),folder=oldPath.slice(0,slash),file=oldPath.slice(slash+1),ext=(file.match(/\.[a-zA-Z0-9]+$/)||['.jpg'])[0],newPath=`${folder}/${Date.now()}__${encodeURIComponent(safe(trimmed))}__renamed${ext}`;const {error}=await client().storage.from(BUCKET).move(oldPath,newPath);if(error){console.error(error);return alert('The shared photo could not be renamed.');}photo.cloudPath=newPath;const {data}=await client().storage.from(BUCKET).createSignedUrl(newPath,3600);if(data?.signedUrl)photo.data=data.signedUrl;}photo.label=trimmed;renamePhotoOnScreen(photo);closeMenu();}
+async function deletePhoto(photo){
+ if(!confirm(`Delete “${photo.label||'this photo'}”? This cannot be undone.`))return;
+ const path=cloudPathFor(photo);
+ if(path){
+  const c=client();if(!c)return alert('You must be signed in to permanently delete this shared photo.');
+  const {data,error}=await c.storage.from(BUCKET).remove([path]);
+  if(error){console.error(error);return alert('The shared photo could not be deleted from cloud storage.');}
+  const gone=await verifyGone(path);
+  if(!gone){console.warn('Supabase remove returned without error but object still exists',data,path);return alert('The photo is still present in cloud storage. Your Supabase delete permission needs to be enabled before this photo can be permanently removed.');}
+ } else if(/^https?:/i.test(photo.data||'')||String(photo.id||'').startsWith('cloud:')){
+  return alert('I could not identify this photo’s cloud storage path, so it was not removed. Please reopen this site and try again.');
+ }
+ db.photos=(db.photos||[]).filter(p=>String(p.id)!==String(photo.id));removePhotoFromScreen(photo);closeMenu();
+}
+async function sharePhoto(photo){try{let file=null;const name=safe(photo.label||'site-photo')+'.jpg';if(photo.data){const r=await fetch(photo.data);const blob=await r.blob();file=new File([blob],name,{type:blob.type||'image/jpeg'});}if(navigator.share){const payload={title:photo.label||'Site photo',text:photo.label||'Site photo'};if(file&&navigator.canShare?.({files:[file]}))payload.files=[file];else if(/^https?:/i.test(photo.data||''))payload.url=photo.data;await navigator.share(payload);closeMenu();return;}if(/^https?:/i.test(photo.data||'')){window.open(photo.data,'_blank');closeMenu();return;}alert('Sharing is not supported on this device.');}catch(err){if(err?.name!=='AbortError'){console.error(err);alert('The photo could not be shared.');}}}
+async function downloadPhoto(photo){try{if(!photo.data)return alert('This photo is not available to download.');const r=await fetch(photo.data);if(!r.ok)throw new Error('download failed');const blob=await r.blob(),type=blob.type||'image/jpeg',ext=type.includes('png')?'.png':type.includes('webp')?'.webp':type.includes('gif')?'.gif':'.jpg',url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=safe(photo.label||'site-photo')+ext;a.style.display='none';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1500);closeMenu();}catch(err){console.error(err);alert('The photo could not be downloaded on this device.');}}
+function openMenu(photo){closeMenu();const wrap=document.createElement('div');wrap.id='ppmPhotoActionMenuV15';wrap.style.cssText='position:fixed;inset:0;z-index:100003;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center;padding:16px;box-sizing:border-box';wrap.innerHTML=`<div style="background:#fff;color:#0f172a;border-radius:16px;padding:12px;width:min(420px,100%);box-shadow:0 20px 40px rgba(0,0,0,.28)"><div style="font-weight:700;padding:8px 10px 12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(photo.label||'Site photo')}</div><button type="button" data-a="rename" style="width:100%;min-height:48px;padding:13px;border:0;border-top:1px solid #e2e8f0;background:#fff;text-align:left;font-size:17px">Rename</button><button type="button" data-a="share" style="width:100%;min-height:48px;padding:13px;border:0;border-top:1px solid #e2e8f0;background:#fff;text-align:left;font-size:17px">Share</button><button type="button" data-a="download" style="width:100%;min-height:48px;padding:13px;border:0;border-top:1px solid #e2e8f0;background:#fff;text-align:left;font-size:17px">⬇ Download</button><button type="button" data-a="delete" style="width:100%;min-height:52px;padding:13px;border:0;border-top:1px solid #e2e8f0;background:#fff7f7;text-align:left;font-size:18px;font-weight:800;color:#b91c1c">🗑 Delete Photo</button><button type="button" data-a="cancel" style="width:100%;min-height:48px;padding:13px;border:0;border-top:1px solid #e2e8f0;background:#fff;text-align:center;font-size:16px;font-weight:700">Cancel</button></div>`;document.body.appendChild(wrap);wrap.addEventListener('click',e=>{const a=e.target?.dataset?.a;if(!a){if(e.target===wrap)closeMenu();return;}if(a==='cancel')return closeMenu();if(a==='rename')return renamePhoto(photo);if(a==='share')return sharePhoto(photo);if(a==='download')return downloadPhoto(photo);if(a==='delete')return deletePhoto(photo);});}
+function matchPhoto(img){const id=img.dataset?.ppmPhotoId;if(id){const p=findPhoto(id);if(p)return p;}const src=img.getAttribute('src')||img.src||'';return (db.photos||[]).find(p=>p.data&&(p.data===src||String(img.src||'')===String(p.data)))||null;}
+function decorate(){const root=$('sites');if(!root)return;root.querySelectorAll('img').forEach(img=>{if(img.id==='ppmPhotoViewerImg')return;const p=matchPhoto(img);if(!p)return;img.dataset.ppmPhotoId=String(p.id);img.draggable=false;img.style.webkitTouchCallout='none';img.style.userSelect='none';let btn=img.parentElement?.querySelector?.(`button[data-ppm-photo-menu="${CSS.escape(String(p.id))}"]`);if(!btn){btn=document.createElement('button');btn.type='button';btn.dataset.ppmPhotoMenu=String(p.id);btn.textContent='⋮ Options';btn.style.cssText='display:inline-flex;align-items:center;justify-content:center;min-height:36px;margin:5px 4px 4px 0;padding:6px 10px;border:1px solid #94a3b8;border-radius:8px;background:#fff;color:#0f172a;font-size:13px;font-weight:700;cursor:pointer';img.insertAdjacentElement('afterend',btn);}});}
+document.addEventListener('click',e=>{const b=e.target?.closest?.('button[data-ppm-photo-menu]');if(!b)return;e.preventDefault();e.stopImmediatePropagation();const p=findPhoto(b.dataset.ppmPhotoMenu);if(p)openMenu(p);},true);
+document.addEventListener('pointerdown',e=>{const img=e.target?.closest?.('#sites img');if(!img)return;const p=matchPhoto(img);if(!p)return;longPressed=false;clearTimeout(timer);timer=setTimeout(()=>{longPressed=true;openMenu(p);navigator.vibrate?.(30);},600);},true);
+document.addEventListener('pointerup',()=>clearTimeout(timer),true);document.addEventListener('pointercancel',()=>clearTimeout(timer),true);document.addEventListener('contextmenu',e=>{const img=e.target?.closest?.('#sites img');if(!img)return;const p=matchPhoto(img);if(!p)return;e.preventDefault();openMenu(p);},true);document.addEventListener('click',e=>{if(!longPressed)return;const img=e.target?.closest?.('#sites img');if(img){e.preventDefault();e.stopImmediatePropagation();longPressed=false;}},true);
+new MutationObserver(()=>setTimeout(decorate,25)).observe(document.documentElement,{childList:true,subtree:true});window.openPhotoActionsV15=id=>{const p=findPhoto(id);if(p)openMenu(p);};window.refreshPhotoActionsV15=decorate;setTimeout(decorate,100);setTimeout(decorate,700);setTimeout(decorate,1600);
+})();
