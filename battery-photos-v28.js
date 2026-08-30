@@ -32,7 +32,8 @@ async function discoverBatteryPhotos(siteId){
    const path=`${folder}/${f.name}`;
    let p=db.photos.find(x=>x.cloudPath===path);
    if(!p){p={id:`cloud:${f.id||path}`,siteId:Number(siteId),assetRef:String(asset.id),label:labelFromName(f.name),comment:'',cloudPath:path,createdAt:f.created_at||f.updated_at||new Date().toISOString(),cloudShared:true};db.photos.push(p);changed=true;}
-   if(!p.data){const u=await signedUrl(path);if(u){p.data=u;p.cloudSignedUrl=true;changed=true;}}
+   const u=await signedUrl(path);
+   if(u&&p.data!==u){p.data=u;p.cloudSignedUrl=true;changed=true;}
   }
  }
  return changed;
