@@ -79,14 +79,15 @@ Storage.prototype.setItem=function(key,value){
 };
 
 async function migrateLegacyOrLocal(){
+ const photos=localPhotos();
  let source=db;
  const {data:legacy,error:legacyError}=await client.from('ppm_app_state').select('state').eq('user_id',session.user.id).maybeSingle();
  if(!legacyError&&legacy?.state?.sites?.length)source=legacy.state;
- const original=db;
- if(source!==db){suppress=true;Object.keys(db).forEach(k=>delete db[k]);Object.assign(db,source,{photos:localPhotos()});suppress=false;}
+ const usedLegacy=source!==db;
+ if(usedLegacy){suppress=true;Object.keys(db).forEach(k=>delete db[k]);Object.assign(db,source,{photos});suppress=false;}
  sharedReady=true;
  await pushShared();
- if(source!==original)originalSetItem.call(localStorage,STORAGE_KEY,JSON.stringify(db));
+ if(usedLegacy)originalSetItem.call(localStorage,STORAGE_KEY,JSON.stringify(db));
 }
 
 async function loadCloud(){
