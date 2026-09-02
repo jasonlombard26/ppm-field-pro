@@ -40,6 +40,9 @@ returns boolean language sql stable security definer set search_path=public as $
   select exists(select 1 from public.ppm_site_members m where m.site_id=p_site_id and m.user_id=auth.uid() and m.role='admin');
 $$;
 
+revoke all on function public.ppm_user_has_site_access(bigint) from public;
+revoke all on function public.ppm_user_can_edit_site(bigint) from public;
+revoke all on function public.ppm_user_is_site_admin(bigint) from public;
 grant execute on function public.ppm_user_has_site_access(bigint) to authenticated;
 grant execute on function public.ppm_user_can_edit_site(bigint) to authenticated;
 grant execute on function public.ppm_user_is_site_admin(bigint) to authenticated;
@@ -47,8 +50,8 @@ grant execute on function public.ppm_user_is_site_admin(bigint) to authenticated
 drop policy if exists "PPM shared sites select" on public.ppm_sites;
 create policy "PPM shared sites select" on public.ppm_sites for select to authenticated using (public.ppm_user_has_site_access(id));
 
+-- Site creation is only performed by the controlled SECURITY DEFINER RPC below.
 drop policy if exists "PPM shared sites insert" on public.ppm_sites;
-create policy "PPM shared sites insert" on public.ppm_sites for insert to authenticated with check (created_by=auth.uid());
 
 drop policy if exists "PPM shared sites update" on public.ppm_sites;
 create policy "PPM shared sites update" on public.ppm_sites for update to authenticated
@@ -61,8 +64,8 @@ drop policy if exists "PPM memberships select" on public.ppm_site_members;
 create policy "PPM memberships select" on public.ppm_site_members for select to authenticated
 using (user_id=auth.uid() or public.ppm_user_is_site_admin(site_id));
 
+-- Membership creation is only performed by controlled SECURITY DEFINER RPCs.
 drop policy if exists "PPM memberships insert self creator" on public.ppm_site_members;
-create policy "PPM memberships insert self creator" on public.ppm_site_members for insert to authenticated with check (user_id=auth.uid());
 
 drop policy if exists "PPM memberships update admin" on public.ppm_site_members;
 create policy "PPM memberships update admin" on public.ppm_site_members for update to authenticated
@@ -74,6 +77,7 @@ create policy "PPM memberships delete admin" on public.ppm_site_members for dele
 create or replace function public.ppm_upsert_site_state(p_site_id bigint,p_name text,p_site_state jsonb)
 returns void language plpgsql security definer set search_path=public as $$
 begin
+  if auth.uid() is null then raise exception 'Authentication required'; end if;
   if exists(select 1 from public.ppm_sites where id=p_site_id) then
     if not public.ppm_user_can_edit_site(p_site_id) then raise exception 'No edit access to site %',p_site_id; end if;
     update public.ppm_sites set name=coalesce(p_name,''),site_state=coalesce(p_site_state,'{}'::jsonb),updated_at=now() where id=p_site_id;
@@ -84,12 +88,14 @@ begin
   end if;
 end;
 $$;
+revoke all on function public.ppm_upsert_site_state(bigint,text,jsonb) from public;
 grant execute on function public.ppm_upsert_site_state(bigint,text,jsonb) to authenticated;
 
 create or replace function public.ppm_grant_site_access(p_site_id bigint,p_email text,p_role text default 'technician')
 returns void language plpgsql security definer set search_path=public,auth as $$
 declare target_user uuid;
 begin
+  if auth.uid() is null then raise exception 'Authentication required'; end if;
   if not public.ppm_user_is_site_admin(p_site_id) then raise exception 'Only a site admin can grant access'; end if;
   if p_role not in ('admin','technician','viewer') then raise exception 'Invalid role'; end if;
   select id into target_user from auth.users where lower(email)=lower(trim(p_email)) limit 1;
@@ -98,6 +104,7 @@ begin
   on conflict(site_id,user_id) do update set role=excluded.role;
 end;
 $$;
+revoke all on function public.ppm_grant_site_access(bigint,text,text) from public;
 grant execute on function public.ppm_grant_site_access(bigint,text,text) to authenticated;
 
 comment on table public.ppm_sites is 'Shared site records for PPM Field Pro. site_state contains data scoped to one site.';
