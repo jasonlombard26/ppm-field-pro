@@ -25,7 +25,6 @@ create index if not exists ppm_sites_updated_at_idx on public.ppm_sites(updated_
 alter table public.ppm_sites enable row level security;
 alter table public.ppm_site_members enable row level security;
 
--- SECURITY DEFINER helpers avoid recursive RLS checks between sites and memberships.
 create or replace function public.ppm_user_has_site_access(p_site_id bigint)
 returns boolean
 language sql
@@ -84,10 +83,7 @@ using (user_id = auth.uid() or public.ppm_user_is_site_admin(site_id));
 drop policy if exists "PPM memberships insert self creator" on public.ppm_site_members;
 create policy "PPM memberships insert self creator" on public.ppm_site_members
 for insert to authenticated
-with check (
-  user_id = auth.uid()
-  and exists(select 1 from public.ppm_sites s where s.id=site_id and s.created_by=auth.uid())
-);
+with check (user_id = auth.uid());
 
 drop policy if exists "PPM memberships update admin" on public.ppm_site_members;
 create policy "PPM memberships update admin" on public.ppm_site_members
@@ -99,6 +95,38 @@ drop policy if exists "PPM memberships delete admin" on public.ppm_site_members;
 create policy "PPM memberships delete admin" on public.ppm_site_members
 for delete to authenticated
 using (public.ppm_user_is_site_admin(site_id));
+
+-- Atomic create/update helper used by the browser sync layer.
+-- A new site automatically makes its creator an admin. Existing sites can only be updated by members.
+create or replace function public.ppm_upsert_site_state(
+  p_site_id bigint,
+  p_name text,
+  p_site_state jsonb
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if exists(select 1 from public.ppm_sites where id=p_site_id) then
+    if not public.ppm_user_has_site_access(p_site_id) then
+      raise exception 'No access to site %', p_site_id;
+    end if;
+    update public.ppm_sites
+      set name=coalesce(p_name,''), site_state=coalesce(p_site_state,'{}'::jsonb), updated_at=now()
+      where id=p_site_id;
+  else
+    insert into public.ppm_sites(id,name,site_state,created_by,updated_at)
+      values(p_site_id,coalesce(p_name,''),coalesce(p_site_state,'{}'::jsonb),auth.uid(),now());
+    insert into public.ppm_site_members(site_id,user_id,role)
+      values(p_site_id,auth.uid(),'admin')
+      on conflict(site_id,user_id) do nothing;
+  end if;
+end;
+$$;
+
+grant execute on function public.ppm_upsert_site_state(bigint,text,jsonb) to authenticated;
 
 -- Admin-only helper for granting another existing Supabase user access by email.
 create or replace function public.ppm_grant_site_access(
