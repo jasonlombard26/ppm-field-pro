@@ -9,6 +9,8 @@ This changelog records meaningful application, architecture, database, Supabase,
 - Reconciled current implementation against the stated PPM Field Pro requirements.
 - Documented current repository-defined Supabase tables, RLS, RPCs, private Storage buckets and site-based file paths.
 - Added architectural decisions and a prioritised development backlog.
+- Made live Supabase verification and Android ↔ PC synchronisation a formal Phase 1 release gate.
+- Defined Phase 2 architecture stabilisation and paused major feature work until both gates pass.
 
 ### Application changes
 - No major application functionality was changed in this pass. The repository was inspected and documented only, as requested.
