@@ -27,14 +27,52 @@ set public=false,
     file_size_limit=500 * 1024 * 1024
 where id='ppm-backups';
 
--- Customer backup deletion is destructive: restrict it to site admins.
+-- Photos may be removed by editors; customer backup deletion is admin-only.
 drop policy if exists "PPM site files delete" on storage.objects;
-create policy "PPM site files delete" on storage.objects
+drop policy if exists "PPM site photos delete" on storage.objects;
+drop policy if exists "PPM site backups delete" on storage.objects;
+
+create policy "PPM site photos delete" on storage.objects
 for delete to authenticated
 using (
-  bucket_id in ('ppm-photos','ppm-backups')
+  bucket_id='ppm-photos'
   and (storage.foldername(name))[1]='sites'
-  and coalesce((storage.foldername(name))[2],'') ~ '^[0-9]+$'
+  and coalesce((storage.foldername(name))[2],'') ~ '^[0-9]+
+-- Re-assert least-privilege function execution.
+revoke all on function public.ppm_user_has_site_access(bigint) from public, anon;
+revoke all on function public.ppm_user_can_edit_site(bigint) from public, anon;
+revoke all on function public.ppm_user_is_site_admin(bigint) from public, anon;
+revoke all on function public.ppm_upsert_site_state(bigint,text,jsonb) from public, anon;
+revoke all on function public.ppm_grant_site_access(bigint,text,text) from public, anon;
+
+grant execute on function public.ppm_user_has_site_access(bigint) to authenticated;
+grant execute on function public.ppm_user_can_edit_site(bigint) to authenticated;
+grant execute on function public.ppm_user_is_site_admin(bigint) to authenticated;
+grant execute on function public.ppm_upsert_site_state(bigint,text,jsonb) to authenticated;
+grant execute on function public.ppm_grant_site_access(bigint,text,text) to authenticated;
+
+  and public.ppm_user_can_edit_site(((storage.foldername(name))[2])::bigint)
+);
+
+create policy "PPM site backups delete" on storage.objects
+for delete to authenticated
+using (
+  bucket_id='ppm-backups'
+  and (storage.foldername(name))[1]='sites'
+  and coalesce((storage.foldername(name))[2],'') ~ '^[0-9]+
+-- Re-assert least-privilege function execution.
+revoke all on function public.ppm_user_has_site_access(bigint) from public, anon;
+revoke all on function public.ppm_user_can_edit_site(bigint) from public, anon;
+revoke all on function public.ppm_user_is_site_admin(bigint) from public, anon;
+revoke all on function public.ppm_upsert_site_state(bigint,text,jsonb) from public, anon;
+revoke all on function public.ppm_grant_site_access(bigint,text,text) from public, anon;
+
+grant execute on function public.ppm_user_has_site_access(bigint) to authenticated;
+grant execute on function public.ppm_user_can_edit_site(bigint) to authenticated;
+grant execute on function public.ppm_user_is_site_admin(bigint) to authenticated;
+grant execute on function public.ppm_upsert_site_state(bigint,text,jsonb) to authenticated;
+grant execute on function public.ppm_grant_site_access(bigint,text,text) to authenticated;
+
   and public.ppm_user_is_site_admin(((storage.foldername(name))[2])::bigint)
 );
 
