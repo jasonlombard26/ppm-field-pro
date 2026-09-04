@@ -99,7 +99,7 @@ This is currently a hybrid model: relational Supabase tables are used for sites/
 ## Current development state
 The application is functional but architecturally layered. Newer requirements have frequently been implemented through successive JavaScript override modules rather than refactoring the underlying compressed core. This has preserved working behaviour but creates duplicated/obsolete code paths and increases regression risk.
 
-Many requested features are already present. The next phase should focus on verification, hardening and consolidation rather than rebuilding the application.
+Many requested features are already present. The immediate release gate is to prove that the live Supabase backend and Android ↔ PC synchronisation work correctly, then stabilise the existing architecture. Major feature development is paused until that gate is passed.
 
 ## Known issues / architectural risks
 - Active behaviour depends on script load order and monkey-patching global functions across many versioned files.
@@ -112,12 +112,28 @@ Many requested features are already present. The next phase should focus on veri
 - Cloud photo support is strongest for CCTV and Access Control; the requirement calls for notes/photos for batteries and broader equipment coverage.
 - A Head End area exists, but several Head End cards are placeholders and not fully structured data models.
 
+## Current delivery priority and release gate
+### Phase 1 — Prove the shared backend and cross-device synchronisation
+Major feature work must not resume until repeatable testing confirms:
+- The live Supabase schema, RPCs, RLS policies, private buckets and Storage policies match the repository's intended design.
+- The same authorised site data can be created, read, updated and removed from Android/mobile and desktop/PC.
+- Sites, equipment, intrusion inputs, PPM visits, photos and backup files remain consistent in both directions.
+- Sign-in, sign-out, session restoration, role-based access and unauthorised-access denial behave correctly.
+- Offline edits, reconnect behaviour, concurrent edits, stale local data and sync failures are understood and do not silently lose or overwrite data.
+- A written test record identifies the devices/accounts used, expected results, actual results and any defects.
+
+### Phase 2 — Stabilise the existing architecture
+After Phase 1 defects are fixed, consolidate the active source, reduce load-order/monkey-patch risk, define a single sync ownership path, add regression coverage and document the supported offline/conflict strategy. Preserve existing behaviour and data; do not perform a big-bang rewrite.
+
+### Phase 3 — Resume feature development
+Only after the first two phases meet their acceptance criteria should major feature work resume. Small fixes needed to pass verification are in scope.
+
 ## Outstanding work
-See `TODO.md`. Highest priority themes are:
-1. Verify the live Supabase project against the repository SQL and security assumptions.
-2. Consolidate/normalise the active source so runtime overrides and obsolete versions do not remain the primary architecture.
-3. Close remaining requirement gaps: richer backup metadata, complete photo coverage, password handling, site history/other-work data, and structured networking fields across applicable equipment.
-4. Add repeatable validation/testing for both mobile and desktop flows.
+See `TODO.md`. The ordered priorities are:
+1. Verify the live Supabase deployment and security controls.
+2. Execute and document the Android ↔ PC synchronisation test matrix; fix defects found.
+3. Stabilise and consolidate the existing architecture with regression coverage.
+4. Then close remaining requirement gaps such as backup metadata, broader photo coverage, password handling, site history and networking fields.
 
 ## Working rules for future development
 Before significant changes:
