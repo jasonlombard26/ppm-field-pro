@@ -10,6 +10,10 @@ grant select on table public.ppm_site_members to authenticated;
 grant select, insert, update, delete on table public.ppm_app_state to authenticated;
 revoke insert, update, delete on table public.ppm_site_members from authenticated;
 
+-- Site creation must pass through ppm_upsert_site_state, which creates the
+-- authenticated creator's admin membership atomically.
+drop policy if exists "PPM shared sites insert" on public.ppm_sites;
+
 update storage.buckets
 set public=false,
     file_size_limit=20 * 1024 * 1024,
@@ -24,6 +28,10 @@ where id='ppm-backups';
 drop policy if exists "PPM site files delete" on storage.objects;
 drop policy if exists "PPM site photos delete" on storage.objects;
 drop policy if exists "PPM site backups delete" on storage.objects;
+drop policy if exists "PPM users can view site photos" on storage.objects;
+drop policy if exists "PPM users can upload site photos" on storage.objects;
+drop policy if exists "PPM users can update site photos" on storage.objects;
+drop policy if exists "PPM users can delete site photos" on storage.objects;
 
 create policy "PPM site photos delete" on storage.objects
 for delete to authenticated
