@@ -4,19 +4,50 @@ Status values: `Not started`, `In progress`, `Needs verification`, `Blocked`, `D
 
 ## Critical
 
-### Verify live Supabase deployment
-- **Status:** Needs verification
-- **What:** Compare the live Supabase project with `supabase/setup.sql`, `supabase/shared-site-model.sql` and `supabase/storage-policies.sql`; verify tables, RPCs, RLS, buckets and policies are actually deployed.
-- **Dependencies:** Supabase project access.
-- **Relevant files:** `supabase/*.sql`, `supabase-sync.js`, `cloud-photos-v8.js`, `backups-v34.js`.
-- **Database changes:** None unless drift is found.
+### Phase 1 release gate — verify Supabase and Android ↔ PC synchronisation
+- **Status:** In progress
+- **Rule:** Pause major feature development until every acceptance criterion below is passed or an explicitly documented blocker is accepted.
+- **Scope:** Validate the deployed system, not only the repository code.
 
-### Validate cross-device shared-data behaviour
+#### 1. Live Supabase deployment and access controls
+- Compare the live project with `supabase/setup.sql`, `supabase/shared-site-model.sql` and `supabase/storage-policies.sql`.
+- Verify tables, RPCs, RLS, private buckets and Storage policies are deployed.
+- Confirm admin, technician and viewer permissions, including denial for unauthorised users.
+- Confirm legacy `ppm_app_state` recovery remains intact.
 - **Status:** Needs verification
-- **What:** Confirm data created/edited on Android is visible on desktop and vice versa for sites, equipment, inputs, visits, backups and photos.
-- **Dependencies:** Two authenticated test sessions/users/devices with site membership.
-- **Relevant files:** `supabase-sync.js`, `index.html`, `pc.html`.
-- **Database changes:** None expected.
+- **Dependencies:** Supabase project access.
+
+#### 2. Two-way shared-data test matrix
+Test Android → PC and PC → Android for:
+- Site creation and site information edits.
+- Access Control, Intrusion inputs, CCTV, Batteries and other current equipment records.
+- PPM visit creation, edits and history.
+- Private photo upload, display and deletion by another authorised session.
+- Private backup upload, download and deletion by another authorised session.
+- **Status:** Needs verification
+- **Dependencies:** Android and PC sessions, at least two test accounts where role testing is required.
+- **Relevant files:** `supabase-sync.js`, `index.html`, `pc.html`, cloud-photo and backup modules.
+
+#### 3. Offline, reconnect and conflict behaviour
+- Verify startup offline, editing offline, reconnect sync, stale local cache and simultaneous edits.
+- Confirm failures are visible to the user and do not silently discard data.
+- Determine and document the current conflict rule for `site_state` updates.
+- **Status:** Needs verification
+- **Dependencies:** Repeatable test site and controlled network interruption.
+
+#### 4. Record evidence and defects
+- Create a repeatable test checklist with device/browser, account/role, action, expected result, actual result and evidence.
+- Log defects with reproduction steps and severity.
+- Fix only the defects and safety gaps needed to pass this release gate before architecture consolidation.
+- **Status:** Not started
+
+### Phase 2 release gate — stabilise the existing architecture
+- **Status:** Blocked by Phase 1
+- Establish a canonical source and reduce versioned monkey-patch/load-order debt.
+- Define one clear owner for local cache, remote state, sync state and conflict handling.
+- Add automated checks where practical plus a repeatable Android/PC regression suite.
+- Preserve existing data and behaviour through incremental changes; no big-bang rewrite.
+- Major feature development remains paused until the stabilisation acceptance criteria are documented and passed.
 
 ### Security review of stored equipment passwords
 - **Status:** Not started
@@ -28,7 +59,7 @@ Status values: `Not started`, `In progress`, `Needs verification`, `Blocked`, `D
 ## High
 
 ### Consolidate active source and remove override debt
-- **Status:** Not started
+- **Status:** Blocked by Phase 1 release gate
 - **What:** Establish maintainable canonical source for the core app and reduce the chain of versioned monkey-patch modules. Preserve behaviour while eliminating obsolete loaded code paths.
 - **Dependencies:** Regression test checklist for mobile and desktop.
 - **Relevant files:** compressed payload files, `sites-v6.js`, `latest-notes-v7.js`, `field-updates-v10.js`, `site-tabs-v8.js` and other versioned modules.
