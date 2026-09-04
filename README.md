@@ -2,7 +2,7 @@
 
 Android-installable PWA and desktop interface for programmed preventative maintenance of electronic security systems.
 
-The app supports multiple sites. Lombard Building is an initial site record, not the application itself.
+The app supports multiple sites. the imported example site is an initial site record, not the application itself.
 
 ## Supabase cloud sync
 
