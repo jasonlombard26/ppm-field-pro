@@ -1,5 +1,12 @@
 # PPM Field Pro — Architectural Decisions
 
+## 2026-09-04 — Synchronisation verification is the immediate release gate
+**Decision:** Pause major feature development. First verify the deployed Supabase configuration and prove two-way Android ↔ PC synchronisation; then stabilise the existing architecture before resuming major features.
+
+**Reason:** Shared, reliable field data is foundational. Adding more behaviour before authentication, authorisation, offline/reconnect, conflict handling, photos, backups and cross-device consistency are proven would increase regression and data-loss risk.
+
+**Consequences:** Phase 1 uses a repeatable test matrix and documented evidence. Only fixes required to pass the gate are added. Phase 2 consolidates the layered source and introduces regression coverage without a big-bang rewrite. Feature backlog work resumes only after both gates pass.
+
 ## 2026-09-04 — Existing application is the source of truth
 **Decision:** Continue the existing `jasonlombard26/ppm-field-pro` repository rather than recreating the application.
 
