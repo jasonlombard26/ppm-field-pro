@@ -1,5 +1,13 @@
 # PPM Field Pro — Changelog
 
+
+## 2026-09-04 — Phase 1 security hardening (draft)
+- Added `SECURITY.md` with production handling, disclosure and deployment requirements.
+- Added an additive Supabase hardening script that reasserts least privilege, keeps Storage private, limits photo uploads, and restricts backup deletion to site admins.
+- Escaped account/site values before inserting them into authentication/account HTML.
+- Added weekly and pull-request CodeQL scanning for active JavaScript.
+- Identified repository visibility and plaintext equipment passwords as unresolved critical risks; these require deployment/product decisions before production credentials are safe.
+
 This changelog records meaningful application, architecture, database, Supabase, storage, feature and bug-fix changes from the Project Brain baseline onward. Do not add trivial formatting-only edits.
 
 ## 2026-09-04
