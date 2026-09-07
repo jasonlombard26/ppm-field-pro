@@ -4,6 +4,7 @@
 ## 2026-09-08
 ### Stability / Verification
 - Added a JavaScript-packaged core payload and changed mobile/desktop startup to avoid fragile hidden-iframe payload reads.
+- Fixed clean-start crashes when no site exists yet, allowing a new account to reach site creation.
 - Added the Phase 1 Android ↔ PC synchronisation verification checklist.
 - Recorded confirmed source-audit risks around reconnect order, whole-site last-write-wins updates, viewer writes, deletion/access reconciliation and error reporting.
 - No product features were added.
