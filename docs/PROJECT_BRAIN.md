@@ -15,7 +15,7 @@ Default branch: `main`
 - Static HTML/CSS/JavaScript application; there is no conventional React/Vue/Node build system in the current repository.
 - PWA/mobile entry point: `index.html`, with `manifest.webmanifest` and `service-worker.js`.
 - Desktop entry point: `pc.html`.
-- Both entry points reconstruct a compressed legacy/core HTML payload from `app-payload-*.txt` / `fix2*.txt`, then progressively load active versioned JavaScript modules.
+- Both entry points reconstruct the compressed legacy/core HTML payload exposed by `payload-v37.js`, then progressively load active versioned JavaScript modules. The original `app-payload-*.txt` / `fix2*.txt` chunks remain as source artefacts; startup no longer reads them through hidden iframes.
 - The application is offline-first. Browser state is stored in `localStorage` under `ppmV3Data` and then synchronised to Supabase when authenticated.
 - Supabase JS v2 is loaded from jsDelivr. Configuration is in `supabase-config.js`.
 - Mobile and desktop use the same Supabase backend and the same site-oriented data model.
@@ -155,4 +155,5 @@ Do not treat a requirement as implemented until it is verified against active co
 - [Database and Storage](DATABASE.md)
 - [Architectural Decisions](DECISIONS.md)
 - [Development Backlog](TODO.md)
+- [Synchronisation Verification](SYNC_VERIFICATION.md)
 - [Changelog](CHANGELOG.md)
