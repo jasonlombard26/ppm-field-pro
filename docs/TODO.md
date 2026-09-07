@@ -36,10 +36,19 @@ Test Android → PC and PC → Android for:
 - **Dependencies:** Repeatable test site and controlled network interruption.
 
 #### 4. Record evidence and defects
-- Create a repeatable test checklist with device/browser, account/role, action, expected result, actual result and evidence.
+- Use `docs/SYNC_VERIFICATION.md` for the repeatable device/browser, account/role, expected result and actual result checklist.
 - Log defects with reproduction steps and severity.
 - Fix only the defects and safety gaps needed to pass this release gate before architecture consolidation.
-- **Status:** Not started
+- **Status:** In progress
+
+#### Code-audit findings requiring resolution
+- Reconnect currently calls `loadCloud()` before queuing a push, so remote state can overwrite unsynchronised offline edits.
+- Site writes replace the complete `site_state` JSON without an expected-version check; concurrent devices are last-write-wins.
+- `pushShared()` attempts to write every visible site, including viewer-only sites, and stops at the first permission error.
+- Remote deletion/access removal is not explicitly reconciled with retained local sites.
+- Remote site deletion is not propagated because the push loop only upserts sites that remain locally.
+- Cloud status currently reports several different failures as “setup needed”, limiting diagnosis.
+- **Status:** Confirmed by source audit; live reproduction still required
 
 ### Phase 2 release gate — stabilise the existing architecture
 - **Status:** Blocked by Phase 1
