@@ -1,6 +1,13 @@
 # PPM Field Pro — Changelog
 
 
+## 2026-09-08
+### Stability / Verification
+- Added a JavaScript-packaged core payload and changed mobile/desktop startup to avoid fragile hidden-iframe payload reads.
+- Added the Phase 1 Android ↔ PC synchronisation verification checklist.
+- Recorded confirmed source-audit risks around reconnect order, whole-site last-write-wins updates, viewer writes, deletion/access reconciliation and error reporting.
+- No product features were added.
+
 ## 2026-09-04 — Phase 1 security hardening (draft)
 - Added `SECURITY.md` with production handling, disclosure and deployment requirements.
 - Added an additive Supabase hardening script that reasserts least privilege, keeps Storage private, limits photo uploads, and restricts backup deletion to site admins.
