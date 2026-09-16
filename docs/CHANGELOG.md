@@ -1,6 +1,12 @@
 # PPM Field Pro — Changelog
 
 
+## 2026-09-16
+### Intrusion
+- Added a site-scoped Devices section under Intrusion.
+- Intrusion device records support Input Number, Device Type, Location and Area.
+- Records use the existing asset JSON and shared Supabase site-state sync; no database migration is required.
+
 ## 2026-09-08
 ### Stability / Verification
 - Added a JavaScript-packaged core payload and changed mobile/desktop startup to avoid fragile hidden-iframe payload reads.
