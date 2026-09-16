@@ -52,6 +52,7 @@ Door/device records should support:
 
 ## Intrusion
 - **Implemented** — Inputs are displayed under Intrusion in the latest active override rather than as a primary Integriti-only feature.
+- **Implemented** — A separate Devices section under Intrusion supports Input Number, Device Type, Location and Area.
 - **Implemented** — Import source can identify Integriti, Bosch, Tecom or another source.
 - **Implemented** — CSV import.
 - **Implemented** — Excel XLS/XLSX import via SheetJS loaded from jsDelivr.
