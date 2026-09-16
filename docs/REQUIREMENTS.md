@@ -53,6 +53,7 @@ Door/device records should support:
 ## Intrusion
 - **Implemented** — Inputs are displayed under Intrusion in the latest active override rather than as a primary Integriti-only feature.
 - **Implemented** — A separate Devices section under Intrusion supports Input Number, Device Type, Location and Area.
+- **Implemented in repository / Needs live Supabase verification** — Intrusion devices support the same photo upload, thumbnail, viewer and photo-action workflow as CCTV and Access Control, stored under private site paths `sites/<site-id>/intrusion/<device-id>/<photo-file>`.
 - **Implemented** — Import source can identify Integriti, Bosch, Tecom or another source.
 - **Implemented** — CSV import.
 - **Implemented** — Excel XLS/XLSX import via SheetJS loaded from jsDelivr.
@@ -112,7 +113,7 @@ Camera records should support:
 - **Implemented in repository / Needs live verification** — Storage policies derive site ID from `sites/<site-id>/...` and authorise via site membership.
 - **Implemented** — Device photo paths are site-centric and follow the intended shape `sites/<site-id>/<section>/<record-id>/<photo-file>`.
 - **Implemented** — Signed URLs are used for private file access.
-- **Partial** — Cloud photo sections are currently focused on CCTV and Access Control. Other record types should use the same architecture consistently.
+- **Partial** — Cloud photo sections now cover CCTV, Access Control and Intrusion Devices. Other record types should use the same architecture consistently.
 
 ## Device networking
 - **Implemented** — MAC Address supported for CCTV cameras and access controllers that have IP fields.

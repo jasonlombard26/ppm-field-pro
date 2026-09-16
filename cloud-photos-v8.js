@@ -4,7 +4,7 @@ const BUCKET='ppm-photos';
 const $=id=>document.getElementById(id);
 const activeSiteId=()=>Number(localStorage.getItem('ppmActiveSiteId'))||db.sites?.[0]?.id;
 const safe=s=>(s||'photo').replace(/[^a-zA-Z0-9._-]+/g,'-').replace(/^-+|-+$/g,'').slice(0,80)||'photo';
-const sectionFor=a=>(a?.system||'').toLowerCase().includes('cctv')?'cctv':'access-control';
+const sectionFor=a=>{const system=(a?.system||'').toLowerCase();if(system.includes('cctv'))return 'cctv';if(a?.recordType==='intrusionDevice'||/intrusion|alarm/.test(system))return 'intrusion';return 'access-control';};
 const folderFor=(siteId,section,assetId)=>`sites/${siteId}/${section}/${assetId}`;
 const client=()=>window.ppmSupabase;
 const cloudCache=new Map();
@@ -45,8 +45,9 @@ async function discoverAssetPhotos(asset){
 }
 
 async function discoverForTab(siteId,tab){
-  if(!['cctv','access'].includes(tab)||!client())return;
-  const assets=(db.assets||[]).filter(a=>a.siteId===Number(siteId)&&sectionFor(a)===(tab==='cctv'?'cctv':'access-control'));
+  if(!['cctv','access','intrusion'].includes(tab)||!client())return;
+  const section=tab==='cctv'?'cctv':tab==='intrusion'?'intrusion':'access-control';
+  const assets=(db.assets||[]).filter(a=>a.siteId===Number(siteId)&&sectionFor(a)===section&&(tab!=='intrusion'||a.recordType==='intrusionDevice'));
   let changed=false;
   for(const a of assets){if(await discoverAssetPhotos(a))changed=true;}
   return changed;
@@ -56,7 +57,7 @@ const oldRender=window.renderSiteDetailV7;
 if(typeof oldRender==='function'){
   window.renderSiteDetailV7=function(siteId,tab='info'){
     const result=oldRender(siteId,tab);
-    if(['cctv','access'].includes(tab)&&client()){
+    if(['cctv','access','intrusion'].includes(tab)&&client()){
       discoverForTab(siteId,tab).then(changed=>{if(changed&&document.getElementById('sites')?.dataset?.mode==='detail')oldRender(siteId,tab);}).catch(console.warn);
     }
     return result;
@@ -86,7 +87,7 @@ window.saveDevicePhotoV7=async function(assetId){
   db.photos.push({id:`cloud:${Date.now()}`,siteId:sid,assetRef:String(asset.id),label,comment,cloudPath:path,data:url||'',createdAt:new Date().toISOString(),cloudShared:true});
   if(typeof save==='function')save();
   if(typeof closeModal==='function')closeModal();
-  const tab=section==='cctv'?'cctv':'access';
+  const tab=section==='cctv'?'cctv':section==='intrusion'?'intrusion':'access';
   if(typeof window.renderSiteDetailV7==='function')window.renderSiteDetailV7(sid,tab);
 };
 
@@ -94,6 +95,7 @@ window.refreshSharedPhotosV8=async()=>{
   const sid=activeSiteId();
   await discoverForTab(sid,'cctv');
   await discoverForTab(sid,'access');
+  await discoverForTab(sid,'intrusion');
   if(typeof window.renderSiteDetailV7==='function')window.renderSiteDetailV7(sid,'info');
 };
 })();

@@ -141,7 +141,8 @@ Configured with `public=false`.
 
 Current section mapping:
 - CCTV -> `cctv`
-- non-CCTV photo-capable access records -> `access-control`
+- Access Control -> `access-control`
+- Intrusion Devices -> `intrusion`
 
 Files include a timestamp and encoded label/name components.
 

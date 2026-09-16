@@ -6,6 +6,7 @@
 - Added a site-scoped Devices section under Intrusion.
 - Intrusion device records support Input Number, Device Type, Location and Area.
 - Records use the existing asset JSON and shared Supabase site-state sync; no database migration is required.
+- Added Intrusion Device photo upload, thumbnails, viewer/actions and private cloud discovery using `sites/<site-id>/intrusion/<device-id>/<photo-file>`.
 
 ## 2026-09-08
 ### Stability / Verification
