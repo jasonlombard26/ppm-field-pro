@@ -8,7 +8,9 @@ This is the Phase 1 release-gate checklist. Do not resume major feature developm
 - Before starting, export a local backup from each device if it contains information not yet confirmed in Supabase.
 - Record the exact Android browser/PWA version, PC browser version, account email/role, time and result.
 
-## Current source-audit findings
+## Historical source-audit findings
+
+The 2026-10-01 local patch addresses these source risks; the live/device release gate is still open. See `SYNC_ROLLOUT.md` for actual automated coverage and browser-run blocker.
 | ID | Severity | Finding | Required result |
 |---|---|---|---|
 | SYNC-01 | Critical | Reconnect loads cloud before pushing local changes. Offline edits may be overwritten. | No silent loss; use an explicit merge/conflict strategy. |
@@ -61,8 +63,8 @@ Perform each test in both directions and refresh/reopen the receiving device bef
 | Viewer tries photo upload/delete | ☐ | Denied without misleading success. |
 | Android uploads backup; PC opens it | ☐ | Authorised PC session can list/download it. |
 | PC uploads backup; Android opens it | ☐ | Authorised Android session can list/download it. |
-| Technician tries backup deletion | ☐ | Denied by hardened policy. |
-| Admin deletes test backup | ☐ | Allowed and disappears on both devices. |
+| Technician tries backup overwrite/move/deletion | ☐ | Denied by hardened policy. |
+| Admin updates/deletes test backup | ☐ | Allowed and disappears on both devices. |
 
 ## D. Roles and isolation
 | Test | Result | Pass criteria |
@@ -92,7 +94,11 @@ Run in the Supabase Dashboard with the repository SQL beside it.
 - [ ] `ppm-photos` and `ppm-backups` are private.
 - [ ] Storage policies derive site membership from `sites/<site-id>/...`.
 - [ ] Photo bucket has intended size/MIME limits.
-- [ ] Backup deletion is admin-only after `security-hardening.sql`.
+- [ ] Backup UPDATE/DELETE is admin-only after either order of the revised Storage/hardening scripts.
+- [ ] Direct site UPDATE/DELETE is denied; legacy writer fails closed; stale revision CAS is rejected.
+- [ ] Existing orphaned Storage paths cannot be claimed by a new site ID.
+- [ ] Quota failure/reload retains pending and revoked-site recovery data.
+- [ ] Close old tabs before cutover; verify new-tab lock and auth-boundary reloads.
 - [ ] Results match `setup.sql`, `shared-site-model.sql`, `storage-policies.sql` and `security-hardening.sql`.
 
 ## Defect log

@@ -1,145 +1,296 @@
 (()=>{
-if(window.__ppmSupabaseSync)return;window.__ppmSupabaseSync=true;
-
-const CFG=window.PPM_SUPABASE;
-if(!CFG?.url||!CFG?.publishableKey||!window.supabase){console.warn('PPM cloud sync unavailable: Supabase client/config missing.');return;}
-
-const client=window.supabase.createClient(CFG.url,CFG.publishableKey,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
-window.ppmSupabase=client;
-let session=null,suppress=false,pushTimer=null,offlineChosen=false,sharedReady=false;
-const STORAGE_KEY='ppmV3Data';
+'use strict';
+if(window.__ppmSupabaseSync)return;
+window.__ppmSupabaseSync=true;
+const CFG=window.PPM_SUPABASE,Core=window.PPMSyncCore;
+const STORAGE_KEY='ppmV3Data',META_KEY='ppmSyncJournalV1',CACHE_PREFIX='ppmAccountCacheV1:',UNASSIGNED_PREFIX='ppmUnassignedRecoveryV1:';
 const originalSetItem=Storage.prototype.setItem;
 const escapeHtml=value=>String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
-const localPhotos=()=>Array.isArray(window.db?.photos)?window.db.photos:[];
-const siteIdOf=x=>Number(x?.siteId);
-
-const statusEl=()=>document.getElementById('ppmCloudStatus');
-const setStatus=(text,kind='')=>{const el=statusEl();if(!el)return;el.textContent=text;el.dataset.kind=kind;el.title=kind==='error'?'Changes remain saved on this device and will retry when cloud sync is available.':'PPM Field Pro shared cloud sync';};
-
+const copy=value=>JSON.parse(JSON.stringify(value));
+const emptyState=()=>({sites:[],assets:[],visits:[],faults:[],legacy:[],photos:[]});
+let session=null,journal=null,sharedReady=false,offlineChosen=false,suppress=false,pushTimer=null;
+let legacyChecked=false,legacyRecovery=null,legacyCheckError=false,cacheFrozen=true;
+let running=null,rerun=false,generation=0,sessionReady=false,identityEstablished=false;
+const $=id=>document.getElementById(id);
+const setStatus=(text,kind='')=>{const el=$('ppmCloudStatus');if(el){el.textContent=text;el.dataset.kind=kind;el.title='Open Account to review pending changes or export a recovery copy.';}};
+function reveal(){ $('ppmSyncStartupGuard')?.remove(); }
+function overlay(html){
+  $('ppmAuthOverlay')?.remove();
+  const el=document.createElement('div');el.id='ppmAuthOverlay';
+  el.style.cssText='position:fixed;inset:0;background:#0f172a;z-index:999999;display:grid;place-items:center;padding:18px;overflow:auto';
+  el.innerHTML=`<div style="width:min(600px,100%);box-sizing:border-box;background:white;color:#0f172a;border-radius:16px;padding:22px;max-height:95vh;overflow:auto">${html}</div>`;
+  document.body.appendChild(el);reveal();return el;
+}
+function fatal(message){
+  sharedReady=false;sessionReady=false;cacheFrozen=true;
+  const canExport=journal&&(!journal.meta.ownerId||journal.meta.ownerId===session?.user?.id);
+  overlay(`<h2>Local data needs attention</h2><p>${escapeHtml(message)}</p><p>Do not clear browser data. Reload after resolving the problem.</p>${canExport?'<button id="ppmFatalExport">Export local recovery copy</button>':''}`);
+  if($('ppmFatalExport'))$('ppmFatalExport').onclick=()=>exportRecovery();
+}
+if(!CFG?.url||!CFG?.publishableKey||!window.supabase||!Core){fatal('The cloud sync components could not load. Local data has not been changed.');return;}
+const client=window.supabase.createClient(CFG.url,CFG.publishableKey,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
+window.ppmSupabase=client;
+function persistJournal(){originalSetItem.call(localStorage,META_KEY,JSON.stringify(journal.meta));}
+function replaceState(next){
+  // Persist before mutating memory. A quota failure must leave the visible working copy intact.
+  Core.writeCache(localStorage,next,journal.meta,(key,value)=>originalSetItem.call(localStorage,key,value));
+  suppress=true;
+  try{
+    Object.keys(db).forEach(key=>delete db[key]);Object.assign(db,next);
+    if(typeof renderAll==='function')renderAll();
+    if(typeof showSitesList==='function'&&$('sites')?.classList.contains('active'))showSitesList();
+  }finally{suppress=false;}
+}
 function installStatus(){
- if(statusEl())return;
- const header=document.querySelector('header');if(!header)return;
- const wrap=document.createElement('div');wrap.style='display:flex;align-items:center;gap:6px;margin-left:auto';
- wrap.innerHTML='<span id="ppmCloudStatus" style="font-size:12px;font-weight:700;padding:6px 9px;border-radius:999px;background:#e2e8f0;color:#0f172a">Cloud: checking</span><button id="ppmCloudAccount" class="secondary" style="display:none;padding:6px 8px;font-size:12px">Account</button>';
- header.appendChild(wrap);document.getElementById('ppmCloudAccount').onclick=showAccount;
+  if($('ppmCloudStatus'))return;
+  const header=document.querySelector('header');if(!header)return;
+  const wrap=document.createElement('div');wrap.style.cssText='display:flex;align-items:center;gap:6px;margin-left:auto';
+  wrap.innerHTML='<span id="ppmCloudStatus" style="font-size:12px;font-weight:700;padding:6px 9px;border-radius:999px;background:#e2e8f0;color:#0f172a">Cloud: checking</span><button id="ppmCloudAccount" class="secondary" style="padding:6px 8px;font-size:12px">Account</button>';
+  header.appendChild(wrap);$('ppmCloudAccount').onclick=showAccount;
 }
-
-function stateForSite(site){
- const payload={site:JSON.parse(JSON.stringify(site))};
- Object.entries(db).forEach(([key,value])=>{
-  if(key==='sites'||key==='photos'||!Array.isArray(value))return;
-  const scoped=value.filter(item=>siteIdOf(item)===Number(site.id));
-  if(scoped.length||value.some(item=>item&&Object.prototype.hasOwnProperty.call(item,'siteId')))payload[key]=JSON.parse(JSON.stringify(scoped));
- });
- return payload;
+function classify(error){
+  if(error?.code==='40001')return 'conflict';
+  if(error?.code==='42501')return 'permission';
+  if(['42703','42P01','42883','PGRST202','55000'].includes(error?.code))return 'upgrade';
+  return 'network';
 }
-
-function applySharedRows(rows){
- const photos=localPhotos();
- const remoteIds=new Set((rows||[]).map(r=>Number(r.id)));
- const existing=db&&typeof db==='object'?db:{};
- const next={};
- Object.entries(existing).forEach(([key,value])=>{
-  if(key==='photos')return;
-  if(Array.isArray(value)){
-   if(key==='sites')next[key]=[];
-   else next[key]=value.filter(item=>!remoteIds.has(siteIdOf(item)));
-  }else next[key]=value;
- });
- next.sites=[];
- for(const row of rows||[]){
-  const st=row.site_state||{};const site=st.site||{id:Number(row.id),name:row.name||''};
-  site.id=Number(row.id);next.sites.push(site);
-  Object.entries(st).forEach(([key,value])=>{
-   if(key==='site'||!Array.isArray(value))return;
-   next[key]=next[key]||[];
-   next[key].push(...value.map(item=>({...item,siteId:Number(row.id)})));
-  });
- }
- next.photos=photos;
- suppress=true;Object.keys(db).forEach(k=>delete db[k]);Object.assign(db,next);originalSetItem.call(localStorage,STORAGE_KEY,JSON.stringify(db));suppress=false;
- if(typeof renderAll==='function')renderAll();
- if(typeof showSitesList==='function'&&document.getElementById('sites')?.classList.contains('active'))showSitesList();
+function reportStatus(){
+  if(!session){setStatus('Local only');return;}
+  const issues=journal.issues(db),blocked=issues.filter(item=>item.problem!=='pending');
+  if(legacyRecovery?.sites?.length&&!(db.sites||[]).length&&!issues.length){setStatus('Cloud: legacy recovery available','error');return;}
+  if(legacyCheckError&&!(db.sites||[]).length&&!issues.length){setStatus('Cloud: legacy recovery check unavailable','error');return;}
+  if(blocked.length)setStatus(`Cloud: review ${blocked.length} site${blocked.length===1?'':'s'}`,'error');
+  else if(issues.length)setStatus(`Cloud: ${issues.length} pending`,'error');
+  else setStatus('Cloud: synced','ok');
 }
-
-async function pushShared(){
- if(!session?.user||suppress||offlineChosen||!sharedReady)return;
- setStatus('Cloud: saving');
- for(const site of db.sites||[]){
-  const {error}=await client.rpc('ppm_upsert_site_state',{p_site_id:Number(site.id),p_name:site.name||'',p_site_state:stateForSite(site)});
-  if(error){console.error('PPM shared site save failed',site.id,error);setStatus('Cloud: setup needed','error');return;}
- }
- setStatus('Cloud: saved','ok');
-}
-function queuePush(){clearTimeout(pushTimer);pushTimer=setTimeout(pushShared,750);}
-
+function queuePush(){clearTimeout(pushTimer);pushTimer=setTimeout(()=>sync(),750);}
 Storage.prototype.setItem=function(key,value){
- const result=originalSetItem.call(this,key,value);
- if(this===localStorage&&key===STORAGE_KEY&&!suppress)queuePush();
- return result;
+  if(this===localStorage&&key===STORAGE_KEY&&cacheFrozen&&!suppress)throw new Error('Local cache is locked until account recovery or reload');
+  const result=originalSetItem.call(this,key,value);
+  if(this===localStorage&&key===STORAGE_KEY&&!suppress){
+    if(sessionReady&&sharedReady&&session?.user){
+      journal.observeNew(JSON.parse(value));
+      try{persistJournal();queuePush();}catch(error){fatal('Browser storage is full. Your last local save is retained, but sync is paused.');}
+    }
+  }
+  return result;
 };
-
-async function migrateLegacyOrLocal(){
- const photos=localPhotos();
- let source=db;
- const {data:legacy,error:legacyError}=await client.from('ppm_app_state').select('state').eq('user_id',session.user.id).maybeSingle();
- if(!legacyError&&legacy?.state?.sites?.length)source=legacy.state;
- const usedLegacy=source!==db;
- if(usedLegacy){suppress=true;Object.keys(db).forEach(k=>delete db[k]);Object.assign(db,source,{photos});suppress=false;}
- sharedReady=true;
- await pushShared();
- if(usedLegacy)originalSetItem.call(localStorage,STORAGE_KEY,JSON.stringify(db));
+async function reconcile(epoch){
+  const userId=session.user.id;
+  const [{data:rows,error},{data:members,error:memberError}]=await Promise.all([
+    client.from('ppm_sites').select('id,name,site_state,revision,updated_at').order('name'),
+    client.from('ppm_site_members').select('site_id,role').eq('user_id',userId)
+  ]);
+  if(epoch!==generation)return false;
+  if(error||memberError){
+    sharedReady=false;
+    setStatus(classify(error||memberError)==='upgrade'?'Cloud: database upgrade required':'Cloud: unavailable; local changes retained','error');
+    return false;
+  }
+  if(!legacyChecked){
+    const {data:legacy,error:legacyError}=await client.from('ppm_app_state').select('state').eq('user_id',userId).maybeSingle();
+    if(epoch!==generation)return false;
+    legacyChecked=!legacyError;legacyCheckError=!!legacyError;
+    if(!legacyError&&Array.isArray(legacy?.state?.sites)&&legacy.state.sites.length)legacyRecovery=copy(legacy.state);
+  }
+  const next=journal.reconcile(db,rows||[],members||[]);
+  replaceState(next);sharedReady=true;reportStatus();return true;
 }
-
-async function loadCloud(){
- if(!session?.user)return;
- setStatus('Cloud: loading');
- const {data,error}=await client.from('ppm_sites').select('id,name,site_state,updated_at').order('name');
- if(error){console.error('PPM shared cloud load failed',error);sharedReady=false;setStatus('Cloud: setup needed','error');return;}
- if(data?.length){sharedReady=true;applySharedRows(data);setStatus('Cloud: synced','ok');return;}
- await migrateLegacyOrLocal();
- const {data:after,error:afterError}=await client.from('ppm_sites').select('id,name,site_state,updated_at').order('name');
- if(!afterError&&after?.length){applySharedRows(after);setStatus('Cloud: migrated','ok');}
+async function sync(){
+  if(!session?.user||!sessionReady||offlineChosen)return;
+  if(running){rerun=true;return running;}
+  const epoch=generation;
+  running=(async()=>{
+    try{
+      // Read roles and revisions first; reconciliation never replaces dirty local data.
+      if(!await reconcile(epoch))return;
+      for(const pending of journal.pending(db)){
+        if(epoch!==generation||!sessionReady)break;
+        setStatus('Cloud: saving');
+        const {data,error}=await client.rpc('ppm_save_site_state',{
+          p_site_id:Number(pending.id),p_name:pending.payload.site.name||'',
+          p_site_state:pending.payload,p_expected_revision:pending.expectedRevision
+        });
+        if(epoch!==generation)break;
+        if(error){
+          journal.fail(pending.id,classify(error));
+          persistJournal();
+          // A denied/conflicting site must not stop unrelated editable sites.
+          continue;
+        }
+        journal.acknowledge(pending.id,pending.payload,data);persistJournal();
+      }
+      if(epoch===generation)reportStatus();
+    }catch(error){
+      if(epoch===generation)fatal('Sync paused because local storage or the cloud schema needs attention. Reload after checking available storage and the database migration.');
+      console.warn('PPM sync paused:',error?.name||'Error');
+    }
+  })().finally(()=>{running=null;if(rerun){rerun=false;queuePush();}});
+  return running;
 }
-
+function exportRecovery(legacy=false,unassignedKey=null){
+  const payload=unassignedKey?{format:'ppm-unassigned-recovery-v1',state:JSON.parse(localStorage.getItem(unassignedKey))}:legacy?{format:'ppm-legacy-recovery-v1',state:legacyRecovery}:{format:'ppm-recovery-v1',state:db,sync:journal.meta};
+  const blob=new Blob([JSON.stringify({...payload,exportedAt:new Date().toISOString()},null,2)],{type:'application/json'});
+  const url=URL.createObjectURL(blob),link=document.createElement('a');
+  link.href=url;link.download=legacy?'ppm-legacy-recovery.json':'ppm-local-recovery.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+function parkAccount(){
+  if(!journal.meta.ownerId)return;
+  // Archive first. If storage is full, do not remove the active cache or claim success.
+  originalSetItem.call(localStorage,CACHE_PREFIX+journal.meta.ownerId,JSON.stringify({state:db,meta:journal.meta}));
+  const previous=journal;journal=new Core.Journal();
+  try{replaceState(emptyState());}catch(error){journal=previous;throw error;}
+  localStorage.removeItem('ppmActiveSiteId');
+}
+function unassignedKeys(){return Array.from({length:localStorage.length},(_v,index)=>localStorage.key(index)).filter(key=>key?.startsWith(UNASSIGNED_PREFIX));}
+function activateAccount(userId){
+  if(journal.meta.ownerId&&journal.meta.ownerId!==userId)parkAccount();
+  if(!journal.meta.ownerId){
+    const archived=localStorage.getItem(CACHE_PREFIX+userId);
+    if(archived){
+      // Never silently discard pre-login offline work when restoring an account.
+      if((db.sites||[]).length){
+        const raw=JSON.stringify(db);
+        const existing=unassignedKeys().some(key=>localStorage.getItem(key)===raw);
+        if(!existing)originalSetItem.call(localStorage,UNASSIGNED_PREFIX+crypto.randomUUID(),raw);
+      }
+      const restored=JSON.parse(archived);
+      if(restored.meta?.ownerId!==userId)throw new Error('Account cache owner mismatch');
+      journal=new Core.Journal(restored.meta);replaceState(restored.state);
+    }else{journal.meta.ownerId=userId;persistJournal();}
+  }
+}
+async function useSession(newSession){
+  identityEstablished=true;cacheFrozen=true;
+  generation++;sharedReady=false;sessionReady=false;clearTimeout(pushTimer);
+  if(!newSession?.user){
+    session=null;
+    try{parkAccount();}catch(error){fatal('The account cache could not be archived. It is still saved locally. Close this tab on a shared device.');return;}
+    authOverlay();setStatus('Signed out; account cache locked');return;
+  }
+  session=newSession;offlineChosen=false;
+  try{activateAccount(session.user.id);}catch(error){fatal(error.message);return;}
+  sessionReady=true;cacheFrozen=false;$('ppmAuthOverlay')?.remove();reveal();await sync();
+}
+function authOverlay(message=''){
+  const el=overlay(`<h2>PPM Field Pro</h2><p>Sign in to open your account cache and shared sites.</p><label>Email <input id="ppmAuthEmail" type="email" autocomplete="email" style="width:100%;box-sizing:border-box;margin:5px 0 12px;padding:11px"></label><label>Password <input id="ppmAuthPassword" type="password" autocomplete="current-password" style="width:100%;box-sizing:border-box;margin:5px 0 12px;padding:11px"></label><p id="ppmAuthMsg" style="color:#b91c1c">${escapeHtml(message)}</p><button id="ppmSignIn">Sign in</button> <button id="ppmSignUp">Create account</button> <button id="ppmOffline">Use offline only</button><p style="font-size:12px;color:#64748b">Signed-out account caches remain on this device for recovery. They are not encrypted. Offline-only mode opens only unassigned local work.</p>`);
+  const authenticate=async signUp=>{
+    $('ppmAuthMsg').textContent=signUp?'Creating account…':'Signing in…';
+    const email=$('ppmAuthEmail').value.trim(),password=$('ppmAuthPassword').value;
+    const {data,error}=await client.auth[signUp?'signUp':'signInWithPassword']({email,password});
+    if(error){$('ppmAuthMsg').textContent=error.message;return;}
+    if(!data.session){$('ppmAuthMsg').textContent='Check your email to confirm your account, then sign in.';return;}
+    // Auth callback owns transitions, including OAuth/session recovery.
+  };
+  $('ppmSignIn').onclick=()=>authenticate(false);$('ppmSignUp').onclick=()=>authenticate(true);
+  $('ppmOffline').onclick=()=>{cacheFrozen=false;offlineChosen=true;el.remove();setStatus('Local only; sign in before sharing');};
+}
 async function shareActiveSite(){
- const siteId=Number(localStorage.getItem('ppmActiveSiteId'))||db.sites?.[0]?.id;
- const email=document.getElementById('ppmShareEmail')?.value.trim();
- const role=document.getElementById('ppmShareRole')?.value||'technician';
- const msg=document.getElementById('ppmShareMsg');
- if(!siteId||!email){if(msg)msg.textContent='Choose a site and enter the technician email.';return;}
- if(msg)msg.textContent='Sharing…';
- const {error}=await client.rpc('ppm_grant_site_access',{p_site_id:Number(siteId),p_email:email,p_role:role});
- if(error){if(msg)msg.textContent=error.message;return;}
- if(msg)msg.textContent='Site access granted.';
+  const siteId=Number(localStorage.getItem('ppmActiveSiteId'))||db.sites?.[0]?.id;
+  const email=$('ppmShareEmail')?.value.trim(),role=$('ppmShareRole')?.value||'technician',msg=$('ppmShareMsg');
+  if(!siteId||!email){msg.textContent='Choose a site and enter the account email.';return;}
+  if(journal.meta.sites[String(siteId)]?.role!=='admin'){msg.textContent='Only a site admin can grant access.';return;}
+  msg.textContent='Sharing…';
+  const {error}=await client.rpc('ppm_grant_site_access',{p_site_id:Number(siteId),p_email:email,p_role:role});
+  msg.textContent=error?error.message:'Site access granted.';
 }
 window.ppmShareActiveSite=shareActiveSite;
-
-function authOverlay(message=''){
- let el=document.getElementById('ppmAuthOverlay');if(el)el.remove();
- el=document.createElement('div');el.id='ppmAuthOverlay';el.style='position:fixed;inset:0;background:rgba(15,23,42,.82);z-index:99999;display:grid;place-items:center;padding:18px';
- el.innerHTML=`<div style="width:min(430px,100%);background:white;color:#0f172a;border-radius:16px;padding:22px;box-shadow:0 24px 80px rgba(0,0,0,.35)"><h2 style="margin:0 0 6px">PPM Field Pro</h2><p style="margin:0 0 16px;color:#64748b">Sign in to sync sites with the shared cloud database.</p><label style="font-size:12px;font-weight:700">Email</label><input id="ppmAuthEmail" type="email" autocomplete="email" style="width:100%;box-sizing:border-box;margin:5px 0 12px;padding:11px"><label style="font-size:12px;font-weight:700">Password</label><input id="ppmAuthPassword" type="password" autocomplete="current-password" style="width:100%;box-sizing:border-box;margin:5px 0 12px;padding:11px"><div id="ppmAuthMsg" style="min-height:20px;color:#b91c1c;font-size:13px;margin-bottom:8px">${escapeHtml(message)}</div><div style="display:flex;gap:8px;flex-wrap:wrap"><button id="ppmSignIn" style="border:0;border-radius:8px;padding:10px 14px;background:#0f172a;color:white;font-weight:700">Sign in</button><button id="ppmSignUp" style="border:1px solid #cbd5e1;border-radius:8px;padding:10px 14px;background:white;color:#0f172a;font-weight:700">Create account</button><button id="ppmOffline" style="border:0;background:transparent;padding:10px;color:#475569">Use offline only</button></div><p style="font-size:12px;color:#64748b;margin:14px 0 0">Offline changes stay on this device and sync when you reconnect.</p></div>`;
- document.body.appendChild(el);
- const msg=t=>document.getElementById('ppmAuthMsg').textContent=t||'';
- document.getElementById('ppmSignIn').onclick=async()=>{msg('Signing in…');const email=document.getElementById('ppmAuthEmail').value.trim(),password=document.getElementById('ppmAuthPassword').value;const {data,error}=await client.auth.signInWithPassword({email,password});if(error)return msg(error.message);session=data.session;offlineChosen=false;el.remove();document.getElementById('ppmCloudAccount').style.display='inline-block';await loadCloud();};
- document.getElementById('ppmSignUp').onclick=async()=>{msg('Creating account…');const email=document.getElementById('ppmAuthEmail').value.trim(),password=document.getElementById('ppmAuthPassword').value;if(password.length<6)return msg('Use a password of at least 6 characters.');const {data,error}=await client.auth.signUp({email,password});if(error)return msg(error.message);if(data.session){session=data.session;offlineChosen=false;el.remove();document.getElementById('ppmCloudAccount').style.display='inline-block';await loadCloud();}else msg('Account created. Check your email to confirm it, then sign in.');};
- document.getElementById('ppmOffline').onclick=()=>{offlineChosen=true;setStatus('Local only');el.remove();};
-}
-
+const explanations={
+  conflict:'The cloud has another version, or this device has no verified baseline. Your local copy is retained.',
+  'read-only':'You have viewer access. Local edits cannot be uploaded.',
+  unavailable:'This site is no longer returned by the server. Access may have been removed or the site deleted. It will not be recreated.',
+  unconfirmed:'Existing local work has no account/version history. Review it before creating a shared site.',
+  'local-deletion':'Site deletion is not synced automatically. Restore the cloud copy or contact a site admin.',
+  permission:'The server denied this save. Retry after checking membership.',
+  upgrade:'The server requires the reviewed database migration.',
+  network:'The last save failed. Your local copy is retained; retry when connected.',
+  pending:'Local changes are waiting to upload.'
+};
 function showAccount(){
- if(!session?.user)return authOverlay();
- let el=document.getElementById('ppmAuthOverlay');if(el)el.remove();
- const activeSite=(db.sites||[]).find(s=>Number(s.id)===(Number(localStorage.getItem('ppmActiveSiteId'))||db.sites?.[0]?.id));
- el=document.createElement('div');el.id='ppmAuthOverlay';el.style='position:fixed;inset:0;background:rgba(15,23,42,.7);z-index:99999;display:grid;place-items:center;padding:18px';
- el.innerHTML=`<div style="width:min(470px,100%);background:white;color:#0f172a;border-radius:16px;padding:22px"><h3 style="margin-top:0">Cloud account</h3><p style="overflow-wrap:anywhere">${escapeHtml(session.user.email||'')}</p><p style="color:#64748b;font-size:13px">Sites and their equipment, PPM records and history use the shared site database.</p><hr style="border:0;border-top:1px solid #e2e8f0;margin:16px 0"><h4 style="margin:0 0 8px">Share active site</h4><div style="font-size:12px;color:#64748b;margin-bottom:8px">${escapeHtml(activeSite?.name||'No active site')}</div><input id="ppmShareEmail" type="email" placeholder="Technician email" style="width:100%;box-sizing:border-box;margin-bottom:8px;padding:9px"><select id="ppmShareRole" style="width:100%;margin-bottom:8px;padding:9px"><option value="technician">Technician</option><option value="viewer">Viewer</option><option value="admin">Admin</option></select><button id="ppmShareBtn" style="padding:9px 12px">Grant site access</button><div id="ppmShareMsg" style="min-height:18px;font-size:12px;color:#475569;margin-top:7px"></div><div style="display:flex;gap:8px;margin-top:16px"><button id="ppmAccountClose" style="padding:9px 12px">Close</button><button id="ppmSignOut" style="padding:9px 12px">Sign out</button></div></div>`;
- document.body.appendChild(el);document.getElementById('ppmShareBtn').onclick=shareActiveSite;document.getElementById('ppmAccountClose').onclick=()=>el.remove();document.getElementById('ppmSignOut').onclick=async()=>{await client.auth.signOut();session=null;sharedReady=false;el.remove();document.getElementById('ppmCloudAccount').style.display='none';setStatus('Local only');authOverlay();};
+  if(cacheFrozen)return;
+  if(!session?.user)return authOverlay();
+  const issues=journal.issues(db);
+  const rows=issues.map(({id,problem})=>{
+    const entry=journal.meta.sites[id],name=(db.sites||[]).find(site=>String(site.id)===id)?.name||entry.base?.site?.name||id;
+    return `<div style="border-top:1px solid #cbd5e1;padding:12px 0"><b>${escapeHtml(name)}</b><p>${escapeHtml(explanations[problem]||problem)}</p>${entry.remote?`<button data-cloud="${id}">Use cloud copy</button> `:''}${problem==='conflict'&&['admin','technician'].includes(entry.role)?`<button data-local="${id}">Replace cloud with local copy</button>`:''}${problem==='unconfirmed'?`<button data-create="${id}">Create shared site from local copy</button>`:''}</div>`;
+  }).join('');
+  const unassignedNotice=unassignedKeys().map((key,index)=>`<p>Offline recovery copy ${index+1}: <button data-unassigned="${escapeHtml(key)}">Export preserved offline work</button></p>`).join('');
+  const legacyNotice=legacyRecovery?.sites?.length?'<hr><h4>Legacy account data is available</h4><p>Your older account backup is preserved in the legacy table. Export it for review. On an empty device you can restore a local copy, then explicitly approve each new shared site.</p><button id="ppmExportLegacy">Export legacy copy</button> <button id="ppmRestoreLegacy">Restore legacy copy for review</button>':'';
+  const el=overlay(`<h3>Cloud account</h3><p>${escapeHtml(session.user.email||'')}</p><button id="ppmExportRecovery">Export local recovery copy</button> <button id="ppmRetrySync">Retry sync</button>${rows||'<p>No pending shared-site changes.</p>'}${legacyNotice}${unassignedNotice}<hr><h4>Share active site</h4><input id="ppmShareEmail" type="email" placeholder="Existing account email"><select id="ppmShareRole"><option value="technician">Technician</option><option value="viewer">Viewer</option><option value="admin">Admin</option></select><button id="ppmShareBtn">Grant access</button><p id="ppmShareMsg"></p><p style="font-size:12px;color:#64748b">Signing out hides this account’s cache and preserves unsynced work for its next sign-in. Cache and recovery exports are plaintext. Use a trusted device; sign-out is not secure erasure.</p><button id="ppmAccountClose">Close</button> <button id="ppmSignOut">Sign out</button>`);
+  $('ppmExportRecovery').onclick=()=>exportRecovery();
+  for(const button of el.querySelectorAll('[data-unassigned]'))button.onclick=()=>exportRecovery(false,button.dataset.unassigned);
+  if($('ppmExportLegacy'))$('ppmExportLegacy').onclick=()=>exportRecovery(true);
+  if($('ppmRestoreLegacy'))$('ppmRestoreLegacy').onclick=async()=>{
+    if(running)return alert('Sync is still running. Wait for it to finish, then review again.');
+    if((db.sites||[]).length||Object.keys(journal.meta.sites).length)return alert('Restore requires an empty device with no tracked or recovery sites. Export the legacy copy and current recovery copy for manual review.');
+    if(!confirm('Restore the legacy account backup into this device for review? No shared sites will be uploaded until you explicitly approve them.'))return;
+    try{const next=journal.reconcile(copy(legacyRecovery),[],[]);replaceState(next);legacyRecovery=null;reportStatus();showAccount();}catch(error){fatal('Legacy data could not be restored. The original legacy row has not been changed.');}
+  };
+  $('ppmRetrySync').onclick=async()=>{el.remove();await sync();showAccount();};
+  $('ppmShareBtn').onclick=shareActiveSite;$('ppmAccountClose').onclick=()=>el.remove();
+  for(const button of el.querySelectorAll('[data-cloud]'))button.onclick=()=>{
+    if(running)return alert('Sync is still running. Wait for it to finish, then review again.');
+    if(!confirm('Discard this site’s local edits and use the cloud copy? Export a recovery copy first if you need to keep them.'))return;
+    try{const next=journal.chooseCloud(db,button.dataset.cloud);replaceState(next);showAccount();reportStatus();}catch(error){fatal(error.message);}
+  };
+  for(const button of el.querySelectorAll('[data-local]'))button.onclick=async()=>{
+    if(running)return alert('Sync is still running. Wait for it to finish, then review again.');
+    if(!confirm('Replace the last reviewed cloud version of this entire site with your local copy? Other people’s changes in that version will be replaced. Export a recovery copy before continuing.'))return;
+    journal.chooseLocal(button.dataset.local);persistJournal();el.remove();await sync();showAccount();
+  };
+  for(const button of el.querySelectorAll('[data-create]'))button.onclick=async()=>{
+    if(running)return alert('Sync is still running. Wait for it to finish, then review again.');
+    if(!confirm('Upload this complete local site to the signed-in account as a new shared site? Confirm this account is authorised to hold its data. Existing cloud IDs will be rejected.'))return;
+    journal.approveCreation(button.dataset.create);persistJournal();el.remove();await sync();showAccount();
+  };
+  $('ppmSignOut').onclick=async()=>{
+    clearTimeout(pushTimer);generation++;sessionReady=false;cacheFrozen=true;
+    try{parkAccount();}catch(error){sessionReady=true;fatal('Not signed out: storage could not preserve your account cache. Free space or export your work first.');return;}
+    const {error}=await client.auth.signOut();
+    if(error){await useSession(session);showAccount();alert('Sign-out failed. Please reconnect and try again.');return;}
+    // Reload clears rendered records, open previews and in-memory signed-URL caches.
+    location.reload();
+  };
 }
-
 async function init(){
- installStatus();const {data}=await client.auth.getSession();session=data.session;
- client.auth.onAuthStateChange((_event,newSession)=>{session=newSession;if(session){offlineChosen=false;document.getElementById('ppmCloudAccount').style.display='inline-block';}else{sharedReady=false;document.getElementById('ppmCloudAccount').style.display='none';}});
- if(session){document.getElementById('ppmCloudAccount').style.display='inline-block';await loadCloud();}else{setStatus('Local only');authOverlay();}
- window.addEventListener('online',()=>{if(session){setStatus('Cloud: reconnecting');loadCloud().then(queuePush);}});window.addEventListener('offline',()=>setStatus('Cloud: offline','error'));
+  installStatus();overlay('<h2>Opening local cache…</h2>');
+  try{
+    Core.recoverStorage(localStorage,(key,value)=>originalSetItem.call(localStorage,key,value));
+    journal=new Core.Journal(JSON.parse(localStorage.getItem(META_KEY)||'{}'));
+    const persistedState=localStorage.getItem(STORAGE_KEY);
+    if(persistedState){suppress=true;Object.keys(db).forEach(key=>delete db[key]);Object.assign(db,JSON.parse(persistedState));suppress=false;}
+    let authEvents=0;
+    client.auth.onAuthStateChange((event,newSession)=>{
+      const eventNumber=++authEvents;
+      if(identityEstablished&&newSession?.user?.id===session?.user?.id){session=newSession;return;}
+      if(identityEstablished){
+        // Reload on every identity boundary to dispose of old photo requests,
+        // signed-URL caches, record dialogs and other feature-module closures.
+        generation++;sessionReady=false;cacheFrozen=true;clearTimeout(pushTimer);session=newSession;
+        overlay('<h2>Closing the account cache…</h2>');
+        setTimeout(()=>{
+          try{parkAccount();location.reload();}
+          catch(error){fatal('The account cache could not be preserved. Do not clear browser data; close this tab on a shared device.');}
+        },0);
+        return;
+      }
+      // Never await additional Auth calls inside the Supabase callback.
+      setTimeout(()=>{if(eventNumber===authEvents&&!identityEstablished)useSession(newSession);},0);
+    });
+    const {data,error}=await client.auth.getSession();if(error)throw error;
+    if(!authEvents)await useSession(data.session);
+  }catch(error){fatal('The saved account cache could not be opened. Do not clear browser data.');}
+  window.addEventListener('online',()=>sync());
+  window.addEventListener('offline',()=>setStatus('Cloud: offline; local changes retained','error'));
 }
-setTimeout(init,0);
+// A single writer prevents two tabs from overwriting each other's offline cache.
+// The lock is held until this page closes; no timers or network lease is involved.
+if(window.__ppmOwnsCacheLock){
+  init();
+}else if(navigator.locks?.request){
+  navigator.locks.request('ppm-local-cache-writer',{ifAvailable:true},async lock=>{
+    if(!lock){overlay('<h2>PPM Field Pro is open in another tab</h2><p>Close the other PPM tab, then reload this one to protect offline changes.</p>');return;}
+    await init();await new Promise(()=>{});
+  }).catch(()=>fatal('The browser could not lock the local cache. Close other PPM tabs and reload.'));
+}else fatal('This browser needs Web Locks support to protect the offline cache. Use a current supported browser.');
 })();

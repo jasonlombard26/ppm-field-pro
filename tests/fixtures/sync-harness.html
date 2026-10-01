@@ -1,0 +1,57 @@
+<!doctype html><html><head><title>Synthetic sync regression fixture</title></head><body><header></header><main id="records"></main>
+<script src="/sync-core.js"></script><script src="/sync-bootstrap.js"></script>
+<script>
+(async()=>{
+if(!await window.ppmCacheReady){document.body.textContent='PPM is open in another tab';return;}
+const seed=window.TEST_SEED||{},clone=x=>JSON.parse(JSON.stringify(x));
+if(!localStorage.getItem('testSeeded')){
+  if(seed.state)localStorage.setItem('ppmV3Data',JSON.stringify(seed.state));
+  if(seed.meta)localStorage.setItem('ppmSyncJournalV1',JSON.stringify(seed.meta));
+  localStorage.setItem('testSession',JSON.stringify(seed.session===undefined?{user:{id:'account-a',email:'a@example.test'}}:seed.session));
+  localStorage.setItem('testSeeded','1');
+}
+window.db=JSON.parse(localStorage.getItem('ppmV3Data')||'{"sites":[],"assets":[],"photos":[]}');
+window.renderAll=()=>document.getElementById('records').textContent=(db.sites||[]).map(site=>site.name).join(',');renderAll();
+window.PPM_SUPABASE={url:'https://synthetic.invalid',publishableKey:'synthetic-public-test-key'};
+window.testBackend={rows:clone(seed.rows||[]),members:clone(seed.members||[]),calls:[],holdReads:!!seed.holdReads,holdRpc:!!seed.holdRpc,failSites:seed.failSites||[],readCount:0};
+const backend=window.testBackend;
+let authCallback=null;
+const currentSession=()=>JSON.parse(localStorage.getItem('testSession')||'null');
+window.emitAuth=(event,next)=>{localStorage.setItem('testSession',JSON.stringify(next));authCallback?.(event,next);};
+window.supabase={createClient:()=>({
+  from(table){
+    const result=async()=>{
+      backend.readCount++;
+      if(backend.holdReads&&table==='ppm_sites')await new Promise(resolve=>backend.releaseRead=resolve);
+      return {data:clone(table==='ppm_sites'?backend.rows:backend.members),error:null};
+    };
+    return {select(){return {order:result,eq(){return table==='ppm_app_state'?{maybeSingle:async()=>({data:seed.legacy?{state:clone(seed.legacy)}:null,error:null})}:result();}};}};
+  },
+  async rpc(name,args){
+    backend.calls.push({name,args:clone(args)});
+    if(backend.holdRpc)await new Promise(resolve=>backend.releaseRpc=resolve);
+    if(backend.failSites.includes(args.p_site_id))return {error:{code:'42501',message:'Denied'}};
+    const row=backend.rows.find(row=>row.id===args.p_site_id);
+    if(row&&String(row.revision)!==String(args.p_expected_revision)||!row&&args.p_expected_revision!==null)return {error:{code:'40001',message:'Conflict'}};
+    const revision=row?Number(row.revision)+1:1;
+    if(row)Object.assign(row,{revision,site_state:clone(args.p_site_state)});
+    else backend.rows.push({id:args.p_site_id,revision,site_state:clone(args.p_site_state)});
+    return {data:revision,error:null};
+  },
+  auth:{
+    getSession:async()=>({data:{session:currentSession()}}),
+    onAuthStateChange(callback){authCallback=callback;return {data:{subscription:{unsubscribe(){}}}};},
+    signInWithPassword:async()=>{const session={user:{id:'account-a',email:'a@example.test'}};emitAuth('SIGNED_IN',session);return {data:{session}};},
+    signUp:async()=>({data:{session:null}}),
+    signOut:async()=>{emitAuth('SIGNED_OUT',null);return {error:null};}
+  }
+})};
+if(seed.failStateWrite){
+  const native=Storage.prototype.setItem;
+  Storage.prototype.setItem=function(key,value){if(key==='ppmV3Data')throw new DOMException('Synthetic quota','QuotaExceededError');return native.call(this,key,value);};
+}
+for(const src of ['/sync-core.js','/supabase-sync.js']){
+  await new Promise((resolve,reject)=>{const script=document.createElement('script');script.src=src;script.onload=resolve;script.onerror=reject;document.body.appendChild(script);});
+}
+})();
+</script></body></html>
