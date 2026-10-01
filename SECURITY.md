@@ -22,6 +22,14 @@ Do not open a public GitHub issue containing customer information, credentials, 
 
 CCTV/device passwords are currently stored as plaintext inside the site's JSON state and in offline browser storage. Masking a password in the interface does not encrypt it. Do not treat this field as a secure password vault. A separate encrypted secret-storage design is required before storing production credentials.
 
+## Account cache and deletion safeguards
+
+Sign-out preserves unsynced work in account-scoped browser recovery storage. It hides records from ordinary signed-out UI and reloads in-memory feature state; it does not encrypt or securely erase caches, downloaded exports, or previously issued signed URLs. Use trusted devices only.
+
+Whole-site saves require a revision check. Physical site deletion is disabled pending a safe storage-aware lifecycle, and IDs with existing PPM Storage objects cannot be newly claimed. Do not restore legacy write/delete grants as a workaround.
+
+See `docs/SYNC_ROLLOUT.md` for cutover, compatibility, recovery and test limitations. Source controls do not establish that the live database is configured correctly.
+
 ## Deployment verification
 
 Before a release, verify the live Supabase deployment against:

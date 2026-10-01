@@ -41,14 +41,13 @@ Test Android → PC and PC → Android for:
 - Fix only the defects and safety gaps needed to pass this release gate before architecture consolidation.
 - **Status:** In progress
 
-#### Code-audit findings requiring resolution
-- Reconnect currently calls `loadCloud()` before queuing a push, so remote state can overwrite unsynchronised offline edits.
-- Site writes replace the complete `site_state` JSON without an expected-version check; concurrent devices are last-write-wins.
-- `pushShared()` attempts to write every visible site, including viewer-only sites, and stops at the first permission error.
-- Remote deletion/access removal is not explicitly reconciled with retained local sites.
-- Remote site deletion is not propagated because the push loop only upserts sites that remain locally.
-- Cloud status currently reports several different failures as “setup needed”, limiting diagnosis.
-- **Status:** Confirmed by source audit; live reproduction still required
+#### 2026-10-01 safety patch awaiting release verification
+- Source fixes and local regression tests cover dirty reconnect, whole-site revision checks, role-aware saves, revoked recovery, cache crash consistency and backup permissions.
+- Physical site deletion is disabled until an approved storage-aware lifecycle exists; local deletion remains a reviewable unsynced operation.
+- No live Supabase SQL, frontend deployment or two-device verification has been performed.
+- Chromium fixtures could not execute because the review environment blocks required browser sockets; mocked-DOM checks are separate coverage.
+- Complete `docs/SYNC_ROLLOUT.md` and `docs/SYNC_VERIFICATION.md` before release.
+- **Status:** Needs verification
 
 ### Phase 2 release gate — stabilise the existing architecture
 - **Status:** Blocked by Phase 1

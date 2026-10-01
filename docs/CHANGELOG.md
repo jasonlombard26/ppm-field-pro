@@ -1,5 +1,14 @@
 # PPM Field Pro — Changelog
 
+## 2026-10-01 — Local safety review patch, not deployed
+- Added revision-checked whole-site writes and fail-closed legacy compatibility.
+- Preserved pending offline edits, role-aware independent saves, explicit conflict/legacy recovery, owner-scoped logout caches and crash-replay safeguards.
+- Added single-tab cache locking before application startup; old tabs must be closed during cutover.
+- Made backup overwrite/move/delete admin-only and policy reapplication order-independent.
+- Disabled physical site deletion pending a safe lifecycle and rejected new IDs with existing Storage files.
+- Added core, fault-injection, mocked-DOM, PostgreSQL/WASM and loader regression checks. Chromium fixtures remain unrun in the review executor because browser local sockets are blocked.
+- See `SYNC_ROLLOUT.md` for rollout and unverified live/device release gates.
+
 
 ## 2026-09-16
 ### Intrusion

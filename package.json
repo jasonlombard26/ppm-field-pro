@@ -1,0 +1,16 @@
+{
+  "name": "ppm-field-pro",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Local-only regression tests for the static PPM app",
+  "scripts": {
+    "test": "node --test tests/sync-core.test.cjs tests/sync-storage.test.cjs tests/sync-dom.test.cjs tests/site-revisions.test.cjs tests/storage-policies.test.cjs tests/entrypoints.test.cjs",
+    "test:browser": "node --test tests/sync-browser.test.cjs"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "0.5.8",
+    "linkedom": "0.18.12",
+    "playwright": "1.62.1"
+  },
+  "engines": {"node": ">=20"}
+}

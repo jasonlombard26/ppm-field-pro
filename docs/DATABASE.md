@@ -2,6 +2,14 @@
 
 This document distinguishes repository-defined/current implementation from proposed work. It was created from the existing application code and SQL in the repository on 2026-09-04.
 
+## 2026-10-01 local review update
+
+The intended model below is updated by the reviewed sync patch; no live deployment is implied. `ppm_sites.revision bigint` is the CAS version. `ppm_save_site_state(bigint,text,jsonb,bigint)` returns the next revision; NULL expected revision creates only. The legacy writer fails closed. Authenticated users have SELECT-only direct site-table access; site creation/update uses the controlled CAS RPC and physical deletion is disabled. The RPC rejects IDs with existing PPM storage objects to prevent orphan-path takeover.
+
+Technicians can insert/read backups; only site admins can UPDATE/DELETE them. Both Storage SQL files reassert the same restrictive policy set. Explicit grants are included for public tables/functions. Full migration, cache/legacy behavior and limitations: [SYNC_ROLLOUT.md](SYNC_ROLLOUT.md).
+
+The original inventory below remains useful background; the differences listed here and the SQL are authoritative for this review patch.
+
 ## Important verification note
 The repository contains the SQL and client code that define the intended Supabase implementation. During this inspection there was no direct live Supabase database connection available, so it is **not possible to prove from GitHub alone that every table, policy, RPC and bucket below has been executed/deployed exactly as written**. Treat repository-defined items as implemented in code but verify the live Supabase project before destructive or schema-dependent changes.
 
@@ -82,7 +90,7 @@ Returns true for site members with role `admin` or `technician`.
 Returns true only for site admins.
 
 ### `public.ppm_upsert_site_state(bigint,text,jsonb)`
-SECURITY DEFINER RPC used by the client to create or update a site. On first creation, it inserts the current user as site admin. Existing sites require edit access.
+Legacy SECURITY DEFINER signature retained only to return an upgrade-required error. Current clients use the revision-checked `ppm_save_site_state` RPC described above.
 
 ### `public.ppm_grant_site_access(bigint,text,text)`
 SECURITY DEFINER RPC used by site admins to grant/update another existing Supabase user's membership by email.
@@ -92,9 +100,9 @@ Function execution is revoked from `public` and granted to `authenticated` in th
 ## Currently implemented — RLS policies
 ### `ppm_sites`
 - Select: authenticated user must have site access.
-- Insert: no direct insert policy; creation is expected through `ppm_upsert_site_state`.
-- Update: admin or technician via `ppm_user_can_edit_site`.
-- Delete: admin only.
+- Insert: no direct insert policy; creation is expected through `ppm_save_site_state`.
+- Update: direct access denied; admin/technician changes use the revision-checked RPC.
+- Delete: physical site deletion disabled pending controlled lifecycle.
 
 ### `ppm_site_members`
 - Select: user can read their own membership; admins can read memberships for sites they administer.
@@ -160,9 +168,11 @@ Common checks:
 - object path must begin with `sites`
 - second folder component must be numeric and is treated as the site ID
 - read requires `ppm_user_has_site_access(site_id)`
-- insert/update/delete require `ppm_user_can_edit_site(site_id)`
+- insert requires `ppm_user_can_edit_site(site_id)`
+- photo update/delete requires edit access
+- backup update/delete requires site admin access, including restrictive old/new-row guards
 
-This allows any authorised site member to read files for that site regardless of who uploaded them, while admins/technicians can write. Buckets remain private.
+This allows any authorised site member to read files for that site regardless of who uploaded them, while admins/technicians can create files and edit photos; only admins can replace/delete backups. Buckets remain private.
 
 ## Currently implemented — Private file access
 The client creates signed URLs:
@@ -176,6 +186,7 @@ Repository instructions specify:
 1. `supabase/setup.sql`
 2. `supabase/shared-site-model.sql`
 3. `supabase/storage-policies.sql`
+4. `supabase/security-hardening.sql`
 
 The shared model is intentionally additive and does not delete the legacy `ppm_app_state` table.
 

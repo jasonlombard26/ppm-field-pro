@@ -76,3 +76,8 @@
 **Reason:** Most existing application data is still serialised as site-scoped JSON arrays.
 
 **Consequences:** Future normalisation should be incremental and compatibility-conscious, not a big-bang rewrite.
+
+## 2026-10-01 — Reviewed sync safety cutover
+**Decision:** Use optimistic revision checks and explicit whole-site conflict choices. Preserve unsynced work with recoverable local transactions and owner-scoped caches. Fail closed for legacy unversioned writers.
+
+**Consequences:** New frontend/backend must be rolled out together after closing old tabs. Physical site deletion remains disabled until ownership of stored objects can be preserved safely. Plaintext caching, credential rotation and encrypted secret storage remain separate work. See `SYNC_ROLLOUT.md`; this is a local review decision, not a live deployment claim.
