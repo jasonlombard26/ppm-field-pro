@@ -72,7 +72,7 @@ function integritiTab(){const rows=systemRows('integriti');return `<div class=ca
 const oldDetail=window.renderSiteDetailV6;
 window.renderSiteDetailV7=(id,tab='info')=>{
  const s=db.sites.find(x=>x.id===Number(id));if(!s)return window.showSitesList?.();localStorage.setItem('ppmActiveSiteId',String(s.id));
- if(tab==='info')return oldDetail?.(id,'info');
+ if(tab==='info'||tab==='intercom')return oldDetail?.(id,tab);
  const sec=$('sites');if(!sec)return;const tabs=[['info','Site Information'],['headend','Head End'],['access','Access Control'],['intrusion','Intrusion'],['cctv','CCTV'],['batteries','Batteries'],['integriti','Integriti Inputs']];
  let body='';
  if(tab==='headend')body=`<div class=card><h3 style="margin-top:0">Head End</h3><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px"><div class=card style="margin:0"><h4 style="margin:0 0 8px">Access System</h4><div class="tiny muted">No records added yet.</div></div><div class=card style="margin:0"><h4 style="margin:0 0 8px">Intruder System</h4><div class="tiny muted">No records added yet.</div></div><div class=card style="margin:0"><h4 style="margin:0 0 8px">CCTV Server</h4><div class="tiny muted">No records added yet.</div></div><div class=card style="margin:0"><h4 style="margin:0 0 8px">Network Switches</h4><div class="tiny muted">No records added yet.</div></div><div class=card style="margin:0"><h4 style="margin:0 0 8px">Intercom System</h4><div class="tiny muted">No records added yet.</div></div></div></div>`;

@@ -5,8 +5,8 @@ const css=document.createElement('style');
 css.textContent=`
 html.ppm-pc-ui,html.ppm-pc-ui body{background:#f1f5f9!important;color:#0f172a!important;min-width:1050px}
 html.ppm-pc-ui body{display:block!important;min-height:100vh!important}
-html.ppm-pc-ui header{position:fixed!important;left:260px!important;right:0!important;top:0!important;height:64px!important;z-index:2000!important;background:#fff!important;color:#0f172a!important;border-bottom:1px solid #e2e8f0!important;box-sizing:border-box!important;padding:10px 18px!important;display:flex!important;align-items:center!important;gap:12px!important;box-shadow:0 1px 3px rgba(15,23,42,.05)!important}
-html.ppm-pc-ui nav{position:fixed!important;left:0!important;top:0!important;bottom:0!important;width:260px!important;z-index:2100!important;background:#0f172a!important;padding:20px 14px!important;box-sizing:border-box!important;display:flex!important;flex-direction:column!important;gap:7px!important;overflow:auto!important;border:0!important}
+html.ppm-pc-ui header{position:fixed!important;left:260px!important;right:0!important;top:0!important;height:64px!important;z-index:20!important;background:#fff!important;color:#0f172a!important;border-bottom:1px solid #e2e8f0!important;box-sizing:border-box!important;padding:10px 18px!important;display:flex!important;align-items:center!important;gap:12px!important;box-shadow:0 1px 3px rgba(15,23,42,.05)!important}
+html.ppm-pc-ui nav{position:fixed!important;left:0!important;top:0!important;bottom:0!important;width:260px!important;z-index:19!important;background:#0f172a!important;padding:20px 14px!important;box-sizing:border-box!important;display:flex!important;flex-direction:column!important;gap:7px!important;overflow:auto!important;border:0!important}
 html.ppm-pc-ui nav .pc-brand{display:block;padding:4px 8px 20px;margin-bottom:8px;border-bottom:1px solid rgba(255,255,255,.12)}
 html.ppm-pc-ui nav .pc-brand strong{display:block;color:#fff;font-size:19px;letter-spacing:.1px}
 html.ppm-pc-ui nav .pc-brand span{display:block;color:#94a3b8;font-size:12px;margin-top:4px}
@@ -28,12 +28,7 @@ html.ppm-pc-ui #ppmCloudStatus{white-space:nowrap}
 `;
 document.head.appendChild(css);
 
-function hideDevicePhotoButtons(){
- document.querySelectorAll('#sites .card button').forEach(b=>{
-  const t=(b.textContent||'').trim().toLowerCase();
-  if(t==='photo'||t==='photos'||t==='📷 photo'||t==='📷 photos')b.style.display='none';
- });
-}
+function hideDevicePhotoButtons(){ /* Photos are supported on desktop as well as mobile. */ }
 function setup(){
  const nav=document.querySelector('nav');
  if(nav&&!nav.querySelector('.pc-brand')){

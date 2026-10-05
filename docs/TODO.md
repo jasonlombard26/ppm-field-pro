@@ -1,5 +1,11 @@
 # PPM Field Pro — Development Backlog
 
+## 2026-10-05 authorized local feature work
+- **Needs verification:** H3C-QLD-2202 input fields, all-asset photos, shared head ends, platform labels and Contact ID code implemented on the isolated PR13-based branch. See [scope, evidence and remaining gates](H3C-QLD-2202.md).
+- **Needs verification / incomplete:** XLS/XLSX configuration importer and PDF text preview are implemented locally with synthetic checks. Original-file parsing, header calibration and Gallagher entity mapping passed locally. Ambiguous/incomplete rows, seven unresolved numeric endpoints and maintenance-history import remain open; see [current wiring review](WIRING_IMPORT_REVIEW.md). See [checkpoint](IMPORTER_REVIEW.md).
+- Existing live/device release gates remain open; local feature authorization does not authorize release.
+
+
 Status values: `Not started`, `In progress`, `Needs verification`, `Blocked`, `Done`.
 
 ## Critical

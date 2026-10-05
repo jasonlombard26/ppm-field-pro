@@ -1,0 +1,13 @@
+# Browser QA follow-on fixes
+
+Base: `221a764e6894a4bf3989947a635f126f844e9d2f` on the existing isolated feature branch. Findings were read from the separate QA task's `BROWSER-QA-2026-10-05.md`; its checkout, evidence, browser and settings were not modified.
+
+1. **Desktop modal overlap:** the desktop skin raised fixed navigation/header layers to 2100/2000 while the shared modal remained at 50. The skin now retains the base navigation/header ordering at 19/20, below modal dialogs. Account/recovery overlay priority is unchanged.
+2. **Disappearing site tabs:** the old tab shim only restored PPM Visits after the V6/open-site path. Input saves and other sections call V7, which replaces the whole tab bar. The shim now restores PPM Visits and Intercom synchronously after both render paths, without duplicates or deferred callbacks that can decorate a later site. Intercom routes to its existing renderer. PPM Visits reuses the existing site-scoped visit renderer/content and actions, stripping cloned element IDs to avoid competing global targets; it introduces no new visit model or stored results.
+3. **Narrow mobile header:** a shared stylesheet loaded by both entry points gives the mobile header, site picker and account/status controls room to wrap. The cloud-control wrapper has a stable ID; no sync behavior changed. Mobile navigation becomes non-sticky because a fixed 68px offset cannot follow a wrapping header. Desktop rules are excluded from these narrow-screen changes.
+
+Changed loader asset versions prevent stale JS/CSS reuse. The compressed payload and customer data are untouched.
+
+Five regression tests exercise the real site/field/tab/asset renderer chain, input save refresh, both entry-point skins, Intercom and visit content, unique IDs, desktop stacking order and responsive loader/style contracts. These are Node/LinkeDOM and static CSS checks, not rendered browser assertions. Final combined suite: **173 passed, 0 failed, 0 skipped**. Evidence is retained in `ui-qa-fixes-full-suite.tap` alongside the patch.
+
+Required Chrome recheck by the owning QA task: desktop modal labels/controls unobstructed; PPM Visits and Intercom persist after input save and Access Control switching and open the correct content; mobile 390px header exposes complete site/account/status controls without horizontal clipping. This implementation task did not operate the browser. Photo/import file selection still needs the separately requested Chrome permission; no permission or setting was changed here. Android hardware, live Supabase, cross-device concurrency and production release gates remain open.

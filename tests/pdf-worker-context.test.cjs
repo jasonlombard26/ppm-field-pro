@@ -1,0 +1,2 @@
+const test=require('node:test'),assert=require('node:assert/strict'),path=require('path'),{execFileSync}=require('node:child_process');
+test('browser-style worker context reproduces vendor protocol and checks explicit child-port cleanup',()=>{const out=execFileSync(process.execPath,['--experimental-vm-modules',path.join(__dirname,'helpers/pdf-worker-context.cjs')],{encoding:'utf8'});assert.match(out,/success\/failure cleanup passed/);});

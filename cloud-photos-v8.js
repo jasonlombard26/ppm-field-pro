@@ -4,7 +4,7 @@ const BUCKET='ppm-photos';
 const $=id=>document.getElementById(id);
 const activeSiteId=()=>Number(localStorage.getItem('ppmActiveSiteId'))||db.sites?.[0]?.id;
 const safe=s=>(s||'photo').replace(/[^a-zA-Z0-9._-]+/g,'-').replace(/^-+|-+$/g,'').slice(0,80)||'photo';
-const sectionFor=a=>{const system=(a?.system||'').toLowerCase();if(system.includes('cctv'))return 'cctv';if(a?.recordType==='intrusionDevice'||/intrusion|alarm/.test(system))return 'intrusion';return 'access-control';};
+const sectionFor=a=>{if(a?.photoSection)return a.photoSection;if(a?.recordType==='headEnd')return 'head-end';if(/batter|power/i.test(`${a?.system||''} ${a?.subtype||''}`))return 'batteries';if(/intercom/i.test(a?.system||''))return 'intercom';const system=(a?.system||'').toLowerCase();if(system.includes('cctv'))return 'cctv';if(a?.recordType==='intrusionDevice'||/intrusion|alarm/.test(system))return 'intrusion';if(/access|eacs|ids/i.test(system))return 'access-control';return 'other';};
 const folderFor=(siteId,section,assetId)=>`sites/${siteId}/${section}/${assetId}`;
 const client=()=>window.ppmSupabase;
 const cloudCache=new Map();
@@ -28,22 +28,26 @@ function labelFromName(name){
 
 async function discoverAssetPhotos(asset){
   const c=client();if(!c||!asset)return false;
+  const before=window.ppmSiteAccess?.(asset.siteId);if(!before?.readable)return false;
   const sid=asset.siteId||activeSiteId(),section=sectionFor(asset),folder=folderFor(sid,section,asset.id);
   const {data,error}=await c.storage.from(BUCKET).list(folder,{limit:100,sortBy:{column:'created_at',order:'desc'}});
   if(error){console.warn('Photo list failed',error);return false;}
+  const now=window.ppmSiteAccess?.(asset.siteId);if(!now?.readable||now.owner!==before.owner||now.generation!==before.generation)return false;
   db.photos=db.photos||[];let changed=false;
   for(const f of data||[]){
     if(!f?.name||f.name.endsWith('.emptyFolderPlaceholder')||!f.id)continue;
     const path=`${folder}/${f.name}`;
     if(!/\.(jpe?g|png|webp|gif|heic|heif)$/i.test(f.name))continue;
-    let p=db.photos.find(x=>x.cloudPath===path);
+    let p=db.photos.find(x=>x.cloudPath===path||x.uploadPath===path);
     if(!p){p={id:`cloud:${f.id||path}`,siteId:sid,assetRef:String(asset.id),label:labelFromName(f.name),comment:'',cloudPath:path,createdAt:f.created_at||f.updated_at||new Date().toISOString(),cloudShared:true};db.photos.push(p);changed=true;}
     const url=await signedUrl(path);
-    if(url&&p.data!==url){p.data=url;p.cloudSignedUrl=true;changed=true;}
+    const current=window.ppmSiteAccess?.(asset.siteId);if(!current?.readable||current.owner!==before.owner||current.generation!==before.generation)return false;
+    if(url&&!p.pendingUpload&&p.data!==url){p.data=url;p.cloudSignedUrl=true;changed=true;}
   }
   return changed;
 }
 
+window.ppmPhotoSection=sectionFor;window.ppmDiscoverAssetPhotos=discoverAssetPhotos;
 async function discoverForTab(siteId,tab){
   if(!['cctv','access','intrusion'].includes(tab)||!client())return;
   const section=tab==='cctv'?'cctv':tab==='intrusion'?'intrusion':'access-control';
@@ -58,7 +62,7 @@ if(typeof oldRender==='function'){
   window.renderSiteDetailV7=function(siteId,tab='info'){
     const result=oldRender(siteId,tab);
     if(['cctv','access','intrusion'].includes(tab)&&client()){
-      discoverForTab(siteId,tab).then(changed=>{if(changed&&document.getElementById('sites')?.dataset?.mode==='detail')oldRender(siteId,tab);}).catch(console.warn);
+      discoverForTab(siteId,tab).then(changed=>{if(changed&&document.getElementById('sites')?.dataset?.mode==='detail'){if(window.ppmRefreshAssetView)window.ppmRefreshAssetView(siteId,tab);else oldRender(siteId,tab);}}).catch(console.warn);
     }
     return result;
   };

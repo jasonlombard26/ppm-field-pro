@@ -1,5 +1,9 @@
 # PPM Field Pro — Requirements
 
+## 2026-10-05 local feature status
+**Implemented locally / needs device and live verification:** separate input module fields and Contact ID reporting code; all-asset multi-photo entry on mobile/desktop; one head-end asset usable by Access and Intrusion; per-system Generic/Integriti/Gallagher terminology. See [exact behavior, limits and PPM gaps](H3C-QLD-2202.md). Reviewed customer-report import is **not implemented**. Historical statuses below describe the earlier baseline.
+
+
 This document records the desired product requirements and their verified status against the active repository as inspected on 2026-09-04. Status meanings: **Implemented**, **Partial**, **Missing**, or **Needs live verification**.
 
 ## Product and platform
