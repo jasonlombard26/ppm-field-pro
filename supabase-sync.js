@@ -12,6 +12,16 @@ let session=null,journal=null,sharedReady=false,offlineChosen=false,suppress=fal
 let legacyChecked=false,legacyRecovery=null,legacyCheckError=false,cacheFrozen=true;
 let running=null,rerun=false,generation=0,sessionReady=false,identityEstablished=false;
 const $=id=>document.getElementById(id);
+// Feature mutations use the same account/cache state as the sync writer.
+window.ppmSiteAccess=siteId=>{
+  const entry=journal?.meta.sites[String(siteId)];
+  const exists=(db.sites||[]).some(s=>Number(s.id)===Number(siteId));
+  const editable=exists&&!cacheFrozen&&(offlineChosen&&!session||
+    sessionReady&&journal?.meta.ownerId===session?.user?.id&&
+    ['admin','technician'].includes(entry?.role)&&!['unavailable','permission','conflict','upgrade'].includes(entry?.problem));
+  return {editable:!!editable,readable:exists&&!cacheFrozen&&!!sessionReady&&journal?.meta.ownerId===session?.user?.id&&!!entry?.role&&entry?.problem!=='unavailable',admin:!!editable&&entry?.role==='admin',
+    cloud:!!editable&&!!session&&!!entry?.revision,owner:session?.user?.id||null,generation};
+};
 const setStatus=(text,kind='')=>{const el=$('ppmCloudStatus');if(el){el.textContent=text;el.dataset.kind=kind;el.title='Open Account to review pending changes or export a recovery copy.';}};
 function reveal(){ $('ppmSyncStartupGuard')?.remove(); }
 function overlay(html){
@@ -44,7 +54,7 @@ function replaceState(next){
 function installStatus(){
   if($('ppmCloudStatus'))return;
   const header=document.querySelector('header');if(!header)return;
-  const wrap=document.createElement('div');wrap.style.cssText='display:flex;align-items:center;gap:6px;margin-left:auto';
+  const wrap=document.createElement('div');wrap.id='ppmCloudControls';wrap.style.cssText='display:flex;align-items:center;gap:6px;margin-left:auto';
   wrap.innerHTML='<span id="ppmCloudStatus" style="font-size:12px;font-weight:700;padding:6px 9px;border-radius:999px;background:#e2e8f0;color:#0f172a">Cloud: checking</span><button id="ppmCloudAccount" class="secondary" style="padding:6px 8px;font-size:12px">Account</button>';
   header.appendChild(wrap);$('ppmCloudAccount').onclick=showAccount;
 }

@@ -1,5 +1,16 @@
 # PPM Field Pro — Project Brain
 
+## 2026-10-05 wiring importer completion
+Gallagher wiring PDFs now map configuration and proven relationships through the shared confirmed import UI. Original counts and repeat imports are checked; ambiguous numeric endpoints remain flagged. Workbook headings/templates are distinguished from blocked potential assets. See [current review and gates](WIRING_IMPORT_REVIEW.md).
+
+## 2026-10-05 importer follow-on
+Both loaders append the conservative configuration-report importer. XLS/XLSX mappings have synthetic regression coverage; PDF is text preview only. The six original files were later read from a user-authorized local folder; mappings were calibrated without copying customer content into Git. See [importer checkpoint](IMPORTER_REVIEW.md). This does not close release gates.
+
+
+## 2026-10-05 local implementation update
+Explicit user authorization permits H3C-QLD-2202 local feature work while the release freeze remains. Both loaders now append `asset-features-v39.js`. Head ends share existing asset IDs; profiles and file associations are additive site JSON fields. See [current feature model and complete asset inventory](H3C-QLD-2202.md). No deployment or live verification is implied.
+
+
 > **AI/Developer Instruction: Read this file and the linked documentation before modifying PPM Field Pro. Inspect the existing implementation before making changes. Do not recreate functionality that already exists.**
 
 ## Purpose

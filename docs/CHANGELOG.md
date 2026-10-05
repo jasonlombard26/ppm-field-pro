@@ -1,5 +1,23 @@
 # PPM Field Pro — Changelog
 
+## 2026-10-05 - Original-report calibration, not deployed
+- Read the six user-authorized originals without source writes or persisted customer imports.
+- Added verified equipment-description/physical-location aliases and rejected placeholder identities; surfaced incomplete-row warnings.
+- Checked real XLS/XLSX mappings and PDF extraction, then passed 156 automated regressions. No browser or live-sync claim.
+
+## 2026-10-05 - Local importer checkpoint, not deployed
+- Added bounded local XLS/XLSX parsing, configuration preview, selective confirmed apply, idempotent source identities and conflict blocking.
+- Vendored approved SheetJS CE 0.20.3 and matching PDF.js 6.4.299 legacy library/worker with licenses and integrity manifest.
+- PDF text extraction is review-only; Gallagher mapping, browser workers and live/device sync remain unverified. See [review](IMPORTER_REVIEW.md).
+
+
+## 2026-10-05 — H3C-QLD-2202 local feature branch, not deployed
+- Added flexible input module type/number and Contact ID reporting code.
+- Added shared head-end asset applicability, explicit existing-record adoption, per-system terminology and backup references.
+- Extended multi-photo access to every asset category on mobile and desktop with local pending uploads and permission/cache safeguards.
+- Added synthetic regression coverage; see [feature review](H3C-QLD-2202.md). Customer-report importer remains separate and incomplete.
+
+
 ## 2026-10-01 — Local safety review patch, not deployed
 - Added revision-checked whole-site writes and fail-closed legacy compatibility.
 - Preserved pending offline edits, role-aware independent saves, explicit conflict/legacy recovery, owner-scoped logout caches and crash-replay safeguards.

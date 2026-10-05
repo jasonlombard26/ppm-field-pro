@@ -1,5 +1,9 @@
 # PPM Field Pro — Database and Storage
 
+## 2026-10-05 additive client fields
+No SQL migration in this feature branch. Existing site JSON assets retain optional text `moduleType`, `moduleNumber`, `contactIdReportingCode`, `headEndId`, plus shared-system `headEnd`, `headEndType`, `platform`, `appliesTo` and optional `photoSection`. `headEndBackupLinks` is a site-scoped array of file references. Photo bytes/queue remain in the existing account-local `photos` cache and private Storage. See [compatibility details](H3C-QLD-2202.md).
+
+
 This document distinguishes repository-defined/current implementation from proposed work. It was created from the existing application code and SQL in the repository on 2026-09-04.
 
 ## 2026-10-01 local review update

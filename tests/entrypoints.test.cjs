@@ -14,9 +14,9 @@ for(const file of ['index.html','pc.html'])test(`${file} syntax and guarded load
  assert.ok(html.indexOf('sync-bootstrap.js')<html.indexOf('payload-v37.js'));
  assert.match(html,/await window\.ppmCacheReady/);
  assert.match(html,/ppmSyncStartupGuard/);
- assert.match(html,/supabase-sync\.js\?v=38/);
+ assert.match(html,/supabase-sync\.js\?v=40/);
 });
-for(const file of ['sync-core.js','sync-bootstrap.js','supabase-sync.js'])test(`${file} syntax`,()=>{new vm.Script(fs.readFileSync(path.join(root,file),'utf8'),{filename:file});});
+for(const file of ['sync-core.js','sync-bootstrap.js','supabase-sync.js','asset-features-v39.js','field-updates-v10.js','cloud-photos-v8.js','photo-actions-v15.js','backups-v34.js','pc-ui-v1.js'])test(`${file} syntax`,()=>{new vm.Script(fs.readFileSync(path.join(root,file),'utf8'),{filename:file});});
 
 test('HTML parsing finds scripts with closing-tag whitespace without reading comments or external fallbacks',()=>{
  const html=`<!doctype html><html><head></head><body>

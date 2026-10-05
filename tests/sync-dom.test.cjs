@@ -29,6 +29,12 @@ function harness(t,config=seed(),saved){
  return {sandbox,backend,storage,document,emit:(event,session)=>authCallback(event,session),click:async id=>{const el=document.getElementById(id);assert.ok(el,`Missing ${id}`);return el.onclick();}};
 }
 const synced=h=>until(()=>h.document.getElementById('ppmCloudStatus')?.textContent==='Cloud: synced');
+for(const role of ['admin','technician','viewer'])domTest(`feature permissions use live sync journal: ${role}`,async t=>{
+ const h=harness(t,seed(local(),[row()],role));await synced(h);
+ const access=h.sandbox.ppmSiteAccess(1);assert.equal(access.editable,role!=='viewer');assert.equal(access.cloud,role!=='viewer');assert.equal(access.admin,role==='admin');assert.equal(access.readable,true);
+ assert.equal(h.sandbox.ppmSiteAccess(999).editable,false);
+ h.emit('SIGNED_OUT',null);await until(()=>h.sandbox.reloads);assert.equal(h.sandbox.ppmSiteAccess(1).editable,false);
+});
 const edit=(h,name)=>{h.sandbox.db.sites[0].name=name;h.sandbox.db.assets[0].note=name;h.storage.setItem('ppmV3Data',JSON.stringify(h.sandbox.db));};
 domTest('DOM integration: reconnect saves retained offline changes',async t=>{const h=harness(t,seed(local('offline')));await synced(h);assert.equal(h.backend.calls[0].args.p_site_state.site.name,'offline');assert.equal(h.backend.calls[0].args.p_expected_revision,'1');});
 domTest('DOM integration: conflict preserves local edits without RPC',async t=>{const h=harness(t,seed(local('offline'),[row('remote',2)]));await until(()=>h.document.getElementById('ppmCloudStatus')?.textContent.includes('review'));assert.equal(h.sandbox.db.sites[0].name,'offline');assert.equal(h.backend.calls.length,0);await h.click('ppmCloudAccount');assert.match(h.document.body.textContent,/another version/);});

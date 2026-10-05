@@ -1,0 +1,14 @@
+/* Let mobile account/site controls reflow instead of overflowing the viewport. */
+@media (max-width: 600px) {
+  html:not(.ppm-pc-ui) header { flex-wrap: wrap; gap: 8px; padding: 10px 12px; }
+  html:not(.ppm-pc-ui) header > .logo { flex: 0 0 42px; }
+  html:not(.ppm-pc-ui) header > div:not(.logo) { min-width: 0; max-width: 100%; }
+  html:not(.ppm-pc-ui) header > div:nth-child(2) { flex: 1 1 calc(100% - 58px) !important; }
+  html:not(.ppm-pc-ui) header h1 { font-size: 18px; overflow-wrap: anywhere; }
+  html:not(.ppm-pc-ui) #sitePicker { flex: 1 1 100%; width: 100% !important; max-width: 100% !important; min-width: 0; }
+  html:not(.ppm-pc-ui) #ppmCloudControls { flex: 1 1 100%; flex-wrap: wrap; margin-left: 0 !important; }
+  html:not(.ppm-pc-ui) #ppmCloudStatus { min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
+  html:not(.ppm-pc-ui) #ppmCloudAccount { flex: 0 0 auto; }
+  /* Header height follows its contents; a fixed 68px sticky-nav offset is invalid. */
+  html:not(.ppm-pc-ui) nav { position: static; }
+}
